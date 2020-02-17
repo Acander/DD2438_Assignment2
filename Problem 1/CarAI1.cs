@@ -24,7 +24,7 @@ namespace UnityStandardAssets.Vehicles.Car
         Vector3 ra_mid;
         
         List<Vector3> final_path = new List<Vector3>();
-        
+
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
 
@@ -51,9 +51,10 @@ namespace UnityStandardAssets.Vehicles.Car
 
 
             // Plan your path here
-            // ...
+            // get size of the terrian 
             int xn = terrain_manager.myInfo.x_N;
             int zn = terrain_manager.myInfo.z_N;
+            // construct new gridmap since the given one is in float type
             int[][] gridmap = new int[zn][];
             for (int i = 0; i < zn; i++)
             {
@@ -65,6 +66,7 @@ namespace UnityStandardAssets.Vehicles.Car
             }
 
             // below can be used to visualize the grip map: 1 means obstacle, 0 means no obstacle
+            // the red 0 indicates the starting point 
             string lala = "";
             for (int i = 0; i < zn; i++)
             {
@@ -84,21 +86,24 @@ namespace UnityStandardAssets.Vehicles.Car
             }
             Debug.Log(lala);
 
+            // vertex mapping has the same dimension as gridmap
+            // it contains index for each free(0) grid 
             int[,] vertex_mapping = new int[zn, xn];
-            int sum = 0;
+            int num_free_spaces = 0;
             for (int i = 0; i < zn; i++)
             {
                 for (int j = 0; j < xn; j++)
                 {
                     if (gridmap[i][j] == 0)
                     {
-                        sum += 1;
-                        vertex_mapping[i, j] = sum;
+                        num_free_spaces += 1;
+                        vertex_mapping[i, j] = num_free_spaces;
                     }
                 }
             }
-            Debug.LogFormat("total free spaces: {0}",sum);
-            //all edges
+            Debug.LogFormat("total free spaces: {0}",num_free_spaces);
+
+            // add all edges to a list 
             List<Edge> edges = new List<Edge>();
             for (int i = 0; i < zn; i++)
             {
@@ -120,15 +125,16 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
             }
 
-            //set of vertices
+            // init set of vertices
             List<int> vertices = new List<int>();
-            for (int i = 0; i < sum; i++)
+            for (int i = 0; i < num_free_spaces; i++)
             {
                 vertices.Add(i + 1);
             }
 
             // get minimum spanning tree
             List<Edge> MinimumSpanningTree = Kruskals_MST(edges, vertices);
+
             int total_weight = 0;
             foreach(Edge edge in MinimumSpanningTree)
             {
@@ -141,13 +147,14 @@ namespace UnityStandardAssets.Vehicles.Car
                 float v1_z = terrain_manager.myInfo.get_z_pos(zn-1-v1_i);
                 float v2_x = terrain_manager.myInfo.get_x_pos(v2_j);
                 float v2_z = terrain_manager.myInfo.get_z_pos(zn-1-v2_i);
+                // draw blue lines along the edges of mst
                 Debug.DrawLine(new Vector3(v1_x, 0f, v1_z), new Vector3(v2_x, 0f, v2_z), Color.blue, 100f);
                 //Debug.LogFormat("Vertex ({0},{1}) to Vertex ({2},{3}) weight is: {4}", v1_i, v1_j, v2_i, v2_j, edge.Weight);
             }
             Debug.LogFormat("minimum spanning tree weight: {0}", total_weight);
 
             
-
+            // final_mapping expands the gridmap 3 times 
             int[,] final_mapping = new int[3 * zn, 3 * xn];
             for (int i = 0; i < zn; i++)
             {
@@ -179,6 +186,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
             }
 
+            // total step in final mapping 
             int total_step = 0;
             for (int i = 0; i < 3 * zn; i++)
             {
@@ -191,10 +199,9 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
             }
             Debug.LogFormat("total step is {0}", total_step);
-            List<Vector3> final_path = new List<Vector3>();
             print_map(final_mapping, zn, xn);
 
-
+            // find the start index on final_mapping
             int start_i = 3*(zn-1-position_j);
             int start_j = 3*(position_i);
             if(transform.position.x < grid_center_x && transform.position.z < grid_center_z)
@@ -218,6 +225,8 @@ namespace UnityStandardAssets.Vehicles.Car
                 start_j += 1;
             }
             int step = 2;
+
+            // containing the final trajectory
             int[,] trajectory = new int[3 * zn, 3 * xn];
             for (int i = 0; i < 3 * zn; i++)
             {
@@ -233,9 +242,12 @@ namespace UnityStandardAssets.Vehicles.Car
                     }
                 }
             }
-            print_map(trajectory, zn, xn);
+            //print_map(trajectory, zn, xn);
 
-            int current_i = start_i + 1;
+            // current index is the first move to take
+            // start_i +/- 1 means go down/up
+            // start_j +/- 1 means go right/left
+            int current_i = start_i - 1;
             int current_j = start_j;
             Debug.LogFormat("start index: ({0}, {1})", start_i, start_j);
             Debug.LogFormat("next index: ({0}, {1})", current_i, current_j);
@@ -312,28 +324,29 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
                 if (!changed)
                 {
-                    if (up == 1 && (current_i - 1) / 3 == current_i / 3)
+                    int temp_i = current_i;
+                    int temp_j = current_j;
+                    if (up == 1 && (temp_i - 1) / 3 == temp_i / 3)
                     {
                         changed = true;
                         current_i -= 1;
                     }
-                    if (down == 1 && (current_i + 1) / 3 == current_i / 3)
+                    if (down == 1 && (temp_i + 1) / 3 == temp_i / 3)
                     {
                         changed = true;
                         current_i += 1;
                     }
-                    if (left == 1 && (current_j - 1) / 3 == current_j / 3)
+                    if (left == 1 && (temp_j - 1) / 3 == temp_j / 3)
                     {
                         changed = true;
                         current_j -= 1;
                     }
-                    if (right == 1 && (current_j + 1) / 3 == current_j / 3)
+                    if (right == 1 && (temp_j + 1) / 3 == temp_j / 3)
                     {
                         changed = true;
                         current_j += 1;
                     }
                 }
-                //Debug.LogFormat("changed: {0}", changed);
                 if (!changed)
                 {
                     break;
@@ -345,6 +358,7 @@ namespace UnityStandardAssets.Vehicles.Car
                     Debug.DrawLine(old_p, new_p, Color.red, 100f);
                 }
                 final_path.Add(old_p);
+
             }
             Debug.Log("trajectory");
             print_map(trajectory, zn, xn);
@@ -359,6 +373,10 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public static bool at_corner_or_not(int i,int j)
         {
+            // this function checks whether the given (i,j) pair is at corner in a 3x3 grid
+            // (3i,  3j), (3i,  3j+1), (3i,  3j+2)
+            // (3i+1,3j), (3i+1,3j+1), (3i+1,3j+2)
+            // (3i+2,3j), (3i+2,3j+1), (3i+2,3j+2)
             if (i%3 == 1 || j%3 == 1)
             {
                 return false;
@@ -371,6 +389,8 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public Vector3 get_position_in_map_from_ij(int i,int j,int zn)
         {
+            // this function gets (i,j) from final_mapping/trajectory
+            // and returns the vector3 value of that point
             Vector3 result = new Vector3();
             int map_i = j / 3;
             int map_j = zn - 1 - i / 3;
@@ -380,8 +400,6 @@ namespace UnityStandardAssets.Vehicles.Car
             int top_left_j = 3 * map_i;
             float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
             float z_step = (terrain_manager.myInfo.z_high - terrain_manager.myInfo.z_low) / terrain_manager.myInfo.z_N;
-            
-
             if (top_left_i == i && top_left_j == j)
             {
                 // top left
@@ -408,6 +426,7 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public static void print_map(int [,] map, int zn,int xn)
         {
+            // helper function to print map 
             string output = "";
             for (int i = 0; i < 3 * zn; i++)
             {
@@ -422,6 +441,13 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public static Tuple<int, int, int, int> judgement(List<Edge> tree, int[,] map, int i, int j)
         {
+            // go over all the edges in the tree
+            // check if vertex (i,j) in the map is on any of the edges
+            // if there is an edge (i,j)--(i-1,j), then up = 1
+            // if there is an edge (i,j)--(i+1,j), then down = 1
+            // if there is an edge (i,j)--(i,j-1), then left = 1
+            // if there is an edge (i,j)--(i,j+1), then right = 1
+            // the return tuple is <up,down,left,right>
             int up = 0, down = 0, left = 0, right = 0;
             foreach (Edge edge in tree)
             {
@@ -429,49 +455,42 @@ namespace UnityStandardAssets.Vehicles.Car
                 int v1_j = CoordinatesOf<int>(map, edge.Vertex1).Item2;
                 int v2_i = CoordinatesOf<int>(map, edge.Vertex2).Item1;
                 int v2_j = CoordinatesOf<int>(map, edge.Vertex2).Item2;
-
                 if ((i == v1_i && j == v1_j && i - 1 == v2_i && j == v2_j) || (i - 1 == v1_i && j == v1_j && i == v2_i && j == v2_j))
                 {
                     up = 1;
                     break;
                 }
             }
-
             foreach (Edge edge in tree)
             {
                 int v1_i = CoordinatesOf<int>(map, edge.Vertex1).Item1;
                 int v1_j = CoordinatesOf<int>(map, edge.Vertex1).Item2;
                 int v2_i = CoordinatesOf<int>(map, edge.Vertex2).Item1;
                 int v2_j = CoordinatesOf<int>(map, edge.Vertex2).Item2;
-
                 if ((i == v1_i && j == v1_j && i + 1 == v2_i && j == v2_j) || (i + 1 == v1_i && j == v1_j && i == v2_i && j == v2_j))
                 {
                     down = 1;
                     break;
                 }
             }
-
             foreach (Edge edge in tree)
             {
                 int v1_i = CoordinatesOf<int>(map, edge.Vertex1).Item1;
                 int v1_j = CoordinatesOf<int>(map, edge.Vertex1).Item2;
                 int v2_i = CoordinatesOf<int>(map, edge.Vertex2).Item1;
                 int v2_j = CoordinatesOf<int>(map, edge.Vertex2).Item2;
-
                 if ((i == v1_i && j == v1_j && i == v2_i && j - 1 == v2_j) || (i == v1_i && j - 1 == v1_j && i == v2_i && j == v2_j))
                 {
                     left = 1;
                     break;
                 }
             }
-
             foreach (Edge edge in tree)
             {
                 int v1_i = CoordinatesOf<int>(map, edge.Vertex1).Item1;
                 int v1_j = CoordinatesOf<int>(map, edge.Vertex1).Item2;
                 int v2_i = CoordinatesOf<int>(map, edge.Vertex2).Item1;
                 int v2_j = CoordinatesOf<int>(map, edge.Vertex2).Item2;
-
                 if ((i == v1_i && j == v1_j && i == v2_i && j + 1 == v2_j) || (i == v1_i && j + 1 == v1_j && i == v2_i && j == v2_j))
                 {
                     right = 1;
@@ -484,9 +503,11 @@ namespace UnityStandardAssets.Vehicles.Car
 
         public static Tuple<int, int> CoordinatesOf<T>(T[,] matrix, T value)
         {
+            // search in the given 2d array matrix for value T
+            // if found, return (x,y) such that matrix[x,y]==value
+            // if not found, return (-1,-1)
             int w = matrix.GetLength(0); // width
             int h = matrix.GetLength(1); // height
-
             for (int x = 0; x < w; ++x)
             {
                 for (int y = 0; y < h; ++y)
@@ -495,7 +516,6 @@ namespace UnityStandardAssets.Vehicles.Car
                         return Tuple.Create(x, y);
                 }
             }
-
             return Tuple.Create(-1, -1);
         }
 
@@ -505,7 +525,7 @@ namespace UnityStandardAssets.Vehicles.Car
             List<Edge> result = new List<Edge>();
 
             //making set
-            DisjointSet.Set set = new DisjointSet.Set(1000);
+            DisjointSet.Set set = new DisjointSet.Set(500);
             foreach (int vertex in vertices)
                 set.MakeSet(vertex);
 
@@ -581,8 +601,8 @@ namespace UnityStandardAssets.Vehicles.Car
 
             
             // Draw line from front axel mid to target
-            var target = final_path[pid_controller.current];
-            var target_vec = target;
+            //var target = final_path[pid_controller.current];
+            //var target_vec = target;
             //UnityEngine.Debug.DrawLine(fa_mid, target_vec, Color.blue);
 
             // Draw CTE line
