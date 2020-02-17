@@ -1,4 +1,7 @@
-﻿namespace KruskalMinimumSpanningTree
+﻿using System.Collections.Generic;
+using UnityEngine;
+
+namespace KruskalMinimumSpanningTree
 {
     public class PIDController
     {

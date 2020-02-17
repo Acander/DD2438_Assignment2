@@ -23,6 +23,8 @@ namespace UnityStandardAssets.Vehicles.Car
         Vector3 fa_mid;
         Vector3 ra_mid;
         
+        List<Vector3> final_path = new List<Vector3>();
+        
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
 
@@ -579,15 +581,15 @@ namespace UnityStandardAssets.Vehicles.Car
 
             
             // Draw line from front axel mid to target
-            var target = my_path[pid_controller.current];
-            var target_vec = target.fa_pos;
-            UnityEngine.Debug.DrawLine(fa_mid, target_vec, Color.blue);
+            var target = final_path[pid_controller.current];
+            var target_vec = target;
+            //UnityEngine.Debug.DrawLine(fa_mid, target_vec, Color.blue);
 
             // Draw CTE line
             var progress = pid_controller.get_progress_point(fa_mid);
-            UnityEngine.Debug.DrawLine(fa_mid, progress, Color.red);
-            
-            throttle = 0.5f
+            //UnityEngine.Debug.DrawLine(fa_mid, progress, Color.red);
+
+            var throttle = 0.5f;
             /*var throttle = max_throttle;
             var target_vel = target.v;
             var velocity = GetComponent<Rigidbody>().velocity.magnitude;
