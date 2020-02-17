@@ -11,7 +11,18 @@ namespace UnityStandardAssets.Vehicles.Car
     public class CarAI1 : MonoBehaviour
     {
         private CarController m_Car; // the car controller we want to use
-
+        
+        private PIDController pid_controller; // Used for making course corrections
+        // Car information
+        float car_radius = 3f;
+        float L = 2.870426f;
+        float L_f;
+        float L_b;
+        float max_throttle = 1f;
+        float max_v = 8;
+        Vector3 fa_mid;
+        Vector3 ra_mid;
+        
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
 
@@ -23,7 +34,6 @@ namespace UnityStandardAssets.Vehicles.Car
             // get the car controller
             m_Car = GetComponent<CarController>();
             terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
-
 
             // note that both arrays will have holes when objects are destroyed
             // but for initial planning they should work
@@ -337,6 +347,12 @@ namespace UnityStandardAssets.Vehicles.Car
             Debug.Log("trajectory");
             print_map(trajectory, zn, xn);
             Debug.LogFormat("final path length: {0}", final_path.Count);
+            
+            var theta = transform.eulerAngles.y;
+            fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+            // Start on ground
+            fa_mid.y = 0;
+            pid_controller = new PIDController(final_path, m_Car.m_MaximumSteerAngle);
         }
 
         public static bool at_corner_or_not(int i,int j)
@@ -509,6 +525,30 @@ namespace UnityStandardAssets.Vehicles.Car
 
         private void FixedUpdate()
         {
+            /* // friends.Length is the number of friends
+            // GameObject friend in friends --> friend.transform.position --> get positions of friends 
+
+            enemies = GameObject.FindGameObjectsWithTag("Enemy");
+
+            // Execute your path here
+            // ...
+            
+
+            // this is how you access information about the terrain
+            int i = terrain_manager.myInfo.get_i_index(transform.position.x);
+            int j = terrain_manager.myInfo.get_j_index(transform.position.z);
+            float grid_center_x = terrain_manager.myInfo.get_x_pos(i);
+            float grid_center_z = terrain_manager.myInfo.get_z_pos(j);
+
+            Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z));
+
+
+            // this is how you control the car
+            //Debug.Log("Steering:" + steering + " Acceleration:" + acceleration);
+            //m_Car.Move(0f, 0.5f, 0f, 0f);
+            */
+
+            /*
             // friends.Length is the number of friends
             // GameObject friend in friends --> friend.transform.position --> get positions of friends 
 
@@ -530,8 +570,35 @@ namespace UnityStandardAssets.Vehicles.Car
             // this is how you control the car
             //Debug.Log("Steering:" + steering + " Acceleration:" + acceleration);
             //m_Car.Move(0f, 0.5f, 0f, 0f);
+            */
+            var theta = transform.eulerAngles.y;
+            fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+            ra_mid = transform.position - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+            var act_fa_mid = m_Car.m_WheelMeshes[0].transform.position + (m_Car.m_WheelMeshes[1].transform.position - m_Car.m_WheelMeshes[0].transform.position) / 2;
+            var act_ra_mid = m_Car.m_WheelMeshes[2].transform.position + (m_Car.m_WheelMeshes[3].transform.position - m_Car.m_WheelMeshes[2].transform.position) / 2;
 
+            
+            // Draw line from front axel mid to target
+            var target = my_path[pid_controller.current];
+            var target_vec = target.fa_pos;
+            UnityEngine.Debug.DrawLine(fa_mid, target_vec, Color.blue);
 
+            // Draw CTE line
+            var progress = pid_controller.get_progress_point(fa_mid);
+            UnityEngine.Debug.DrawLine(fa_mid, progress, Color.red);
+            
+            throttle = 0.5f
+            /*var throttle = max_throttle;
+            var target_vel = target.v;
+            var velocity = GetComponent<Rigidbody>().velocity.magnitude;
+            if (velocity > target_vel)
+            {
+                throttle = 0;
+            }*/
+
+            var steer = pid_controller.get_controls(fa_mid, transform.right);
+            //UnityEngine.Debug.Log("steer = " + steer);
+            m_Car.Move(steer, throttle, 0f, 0f);
         }
     }
 }
