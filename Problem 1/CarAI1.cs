@@ -167,6 +167,19 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
             }
 
+            int total_step = 0;
+            for (int i = 0; i < 3 * zn; i++)
+            {
+                for(int j = 0; j < 3 * xn; j++)
+                {
+                    if (final_mapping[i, j] == 0)
+                    {
+                        total_step += 1;
+                    }
+                }
+            }
+            Debug.LogFormat("total step is {0}", total_step);
+            List<Vector3> final_path = new List<Vector3>();
             print_map(final_mapping, zn, xn);
 
 
@@ -215,12 +228,18 @@ namespace UnityStandardAssets.Vehicles.Car
             Debug.LogFormat("start index: ({0}, {1})", start_i, start_j);
             Debug.LogFormat("next index: ({0}, {1})", current_i, current_j);
 
+            int old_i = 0;
+            int old_j = 0;
             while (true)
             {
                 bool changed = false;
                 step += 1;
-                int old_i = current_i;
-                int old_j = current_j;
+                if (at_corner_or_not(current_i, current_j))
+                {
+                    old_i = current_i;
+                    old_j = current_j;
+                }
+                
                 trajectory[current_i, current_j] = step;
                 //Debug.LogFormat("trajectory with step: {0}", step);
 
@@ -308,11 +327,28 @@ namespace UnityStandardAssets.Vehicles.Car
                     break;
                 }
                 Vector3 old_p = get_position_in_map_from_ij(old_i, old_j, zn);
-                Vector3 new_p = get_position_in_map_from_ij(current_i, current_j, zn);
-                Debug.DrawLine(old_p, new_p, Color.red, 100f);
+                if (at_corner_or_not(current_i, current_j) && step != total_step-1)
+                {
+                    Vector3 new_p = get_position_in_map_from_ij(current_i, current_j, zn);
+                    Debug.DrawLine(old_p, new_p, Color.red, 100f);
+                }
+                final_path.Add(old_p);
             }
             Debug.Log("trajectory");
             print_map(trajectory, zn, xn);
+            Debug.LogFormat("final path length: {0}", final_path.Count);
+        }
+
+        public static bool at_corner_or_not(int i,int j)
+        {
+            if (i%3 == 1 || j%3 == 1)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
         }
 
         public Vector3 get_position_in_map_from_ij(int i,int j,int zn)
@@ -323,9 +359,10 @@ namespace UnityStandardAssets.Vehicles.Car
             float grid_center_x = terrain_manager.myInfo.get_x_pos(map_i);
             float grid_center_z = terrain_manager.myInfo.get_z_pos(map_j);
             int top_left_i = 3 * (zn - 1 - map_j);
-            int top_left_j = 3 * (map_i);
+            int top_left_j = 3 * map_i;
             float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
             float z_step = (terrain_manager.myInfo.z_high - terrain_manager.myInfo.z_low) / terrain_manager.myInfo.z_N;
+            
 
             if (top_left_i == i && top_left_j == j)
             {
