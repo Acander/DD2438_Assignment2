@@ -47,7 +47,7 @@ namespace UnityStandardAssets.Vehicles.Car
             float grid_center_x = terrain_manager.myInfo.get_x_pos(position_i);
             float grid_center_z = terrain_manager.myInfo.get_z_pos(position_j);
 
-            Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z), Color.white, 100f);
+            //Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z), Color.white, 500f);
             
             Vector3 start_pos = terrain_manager.myInfo.start_pos;
 
@@ -149,7 +149,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 float v2_x = terrain_manager.myInfo.get_x_pos(v2_j);
                 float v2_z = terrain_manager.myInfo.get_z_pos(zn-1-v2_i);
                 // draw blue lines along the edges of mst
-                Debug.DrawLine(new Vector3(v1_x, 0f, v1_z), new Vector3(v2_x, 0f, v2_z), Color.blue, 100f);
+                Debug.DrawLine(new Vector3(v1_x, 0f, v1_z), new Vector3(v2_x, 0f, v2_z), Color.black, 500f);
                 //Debug.LogFormat("Vertex ({0},{1}) to Vertex ({2},{3}) weight is: {4}", v1_i, v1_j, v2_i, v2_j, edge.Weight);
             }
             Debug.LogFormat("minimum spanning tree weight: {0}", total_weight);
@@ -353,10 +353,20 @@ namespace UnityStandardAssets.Vehicles.Car
                     break;
                 }
                 Vector3 old_p = get_position_in_map_from_ij(old_i, old_j, zn);
-                if (at_corner_or_not(current_i, current_j) && step != total_step-1)
+                if (at_corner_or_not(current_i, current_j))
                 {
                     Vector3 new_p = get_position_in_map_from_ij(current_i, current_j, zn);
-                    Debug.DrawLine(old_p, new_p, Color.red, 100f);
+                    if(step <= total_step / 3)
+                    {
+                        Debug.DrawLine(old_p, new_p, Color.red, 500f);
+                    }else if (step > total_step/3 && step <= total_step / 3 * 2)
+                    {
+                        Debug.DrawLine(old_p, new_p, Color.cyan, 500f);
+                    }
+                    else
+                    {
+                        Debug.DrawLine(old_p, new_p, Color.yellow, 500f);
+                    }
                 }
                 final_path.Add(old_p);
 
