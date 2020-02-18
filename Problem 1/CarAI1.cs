@@ -18,7 +18,7 @@ namespace UnityStandardAssets.Vehicles.Car
         float L = 2.870426f;
         float L_f;
         float L_b;
-        float max_throttle = 1f;
+        float max_throttle = 0.3f;
         float max_v = 8;
         Vector3 fa_mid;
         Vector3 ra_mid;
@@ -48,7 +48,8 @@ namespace UnityStandardAssets.Vehicles.Car
             float grid_center_z = terrain_manager.myInfo.get_z_pos(position_j);
 
             Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z), Color.white, 100f);
-
+            
+            Vector3 start_pos = terrain_manager.myInfo.start_pos;
 
             // Plan your path here
             // get size of the terrian 
@@ -364,10 +365,12 @@ namespace UnityStandardAssets.Vehicles.Car
             print_map(trajectory, zn, xn);
             Debug.LogFormat("final path length: {0}", final_path.Count);
             
+            //final_path.Insert(0, start_pos);
             var theta = transform.eulerAngles.y;
             fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
             // Start on ground
             fa_mid.y = 0;
+            final_path.Insert(0, fa_mid);
             pid_controller = new PIDController(final_path, m_Car.m_MaximumSteerAngle);
         }
 
@@ -601,23 +604,23 @@ namespace UnityStandardAssets.Vehicles.Car
 
             
             // Draw line from front axel mid to target
-            //var target = final_path[pid_controller.current];
-            //var target_vec = target;
-            //UnityEngine.Debug.DrawLine(fa_mid, target_vec, Color.blue);
+            var target = final_path[pid_controller.current];
+            var target_vec = target;
+            Debug.DrawLine(fa_mid, target_vec, Color.blue);
 
             // Draw CTE line
             var progress = pid_controller.get_progress_point(fa_mid);
-            //UnityEngine.Debug.DrawLine(fa_mid, progress, Color.red);
-
-            var throttle = 0.5f;
-            /*var throttle = max_throttle;
-            var target_vel = target.v;
+            //Debug.DrawLine(fa_mid, progress, Color.red);
+            
+            var throttle = max_throttle;
+            var target_vel = 2f;
             var velocity = GetComponent<Rigidbody>().velocity.magnitude;
             if (velocity > target_vel)
             {
                 throttle = 0;
-            }*/
+            }
 
+            Debug.LogFormat("Here am I now: {0}", transform.position);
             var steer = pid_controller.get_controls(fa_mid, transform.right);
             //UnityEngine.Debug.Log("steer = " + steer);
             m_Car.Move(steer, throttle, 0f, 0f);

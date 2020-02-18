@@ -41,9 +41,15 @@ namespace KruskalMinimumSpanningTree
             // Check if passed current goal
             var start_pos = path[current - 1];
             var end_pos = path[current];
+            Debug.LogFormat("start_pos: {0}", start_pos);
+            Debug.LogFormat("end_pos: {0}", end_pos);
             if (passed(pos, start_pos, end_pos))
             {
-                current++;
+                Debug.Log("Passed a point");
+                //Debug.Log(current);
+                current += 1;
+                
+                //Debug.LogFormat("Current waypoint: {0}", path[current]);
                 return 0;
             }
 
@@ -96,7 +102,7 @@ namespace KruskalMinimumSpanningTree
             var between = end_pos - start_pos;
             var progress = pos - start_pos;
             var projection = Vector3.Project(progress, between);
-            return projection.magnitude > between.magnitude;
+            return projection.magnitude + 2 >= between.magnitude;
         }
 
         public float get_CTE(Vector3 pos, Vector3 start_pos, Vector3 end_pos)
