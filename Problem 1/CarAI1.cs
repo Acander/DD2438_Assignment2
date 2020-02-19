@@ -227,7 +227,8 @@ namespace UnityStandardAssets.Vehicles.Car
             }
             int step = 2;
 
-            // containing the final trajectory
+            // constructing the final trajectory with [start_i,start_j]=2
+            // others are same as final mapping 
             int[,] trajectory = new int[3 * zn, 3 * xn];
             for (int i = 0; i < 3 * zn; i++)
             {
@@ -250,34 +251,30 @@ namespace UnityStandardAssets.Vehicles.Car
             // start_j +/- 1 means go right/left
             int current_i = start_i - 1;
             int current_j = start_j;
-            Debug.LogFormat("start index: ({0}, {1})", start_i, start_j);
-            Debug.LogFormat("next index: ({0}, {1})", current_i, current_j);
-
-            int old_i = 0;
-            int old_j = 0;
+            Vector3 old_old_p, old_p, new_p;
+            old_old_p = transform.position;
+            // now this is hard-coded with the car going (0,0,1)
+            old_p = transform.position + Vector3.forward;
+            // the loop goes over every 0 value position in the trajectory
+            // and give a step value to each (i,j) pair in trajectory
             while (true)
             {
                 bool changed = false;
                 step += 1;
-                if (at_corner_or_not(current_i, current_j))
-                {
-                    old_i = current_i;
-                    old_j = current_j;
-                }
-                
                 trajectory[current_i, current_j] = step;
                 //Debug.LogFormat("trajectory with step: {0}", step);
-
                 int up = trajectory[current_i - 1, current_j] == 0 ? 1 : 0;
                 int down = trajectory[current_i + 1, current_j] == 0 ? 1 : 0;
                 int left = trajectory[current_i, current_j - 1] == 0 ? 1 : 0;
                 int right = trajectory[current_i, current_j + 1] == 0 ? 1 : 0;
                 if (up + down + left + right == 0)
                 {
+                    // if there is no zero surrounding, then the loop is finished
                     break;
                 }
                 if (up + down + left + right == 1)
                 {
+                    // if there is only zero nearby, just go to that zero
                     if (up == 1)
                     {
                         current_i -= 1;
@@ -301,6 +298,8 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
                 else
                 {
+                    // if there are more than one zeros around
+                    // go along with the spanning tree direction
                     var hehe = judgement(MinimumSpanningTree, vertex_mapping, current_i / 3, current_j / 3);
                     if (up == 1 && hehe.Item1 == 1)
                     {
@@ -325,6 +324,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
                 if (!changed)
                 {
+                    // if still not changed, go to zero that lives in the same big grid as the current one
                     int temp_i = current_i;
                     int temp_j = current_j;
                     if (up == 1 && (temp_i - 1) / 3 == temp_i / 3)
@@ -350,27 +350,40 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
                 if (!changed)
                 {
+                    // this shall never be entered, but is here just in case
                     break;
                 }
-                Vector3 old_p = get_position_in_map_from_ij(old_i, old_j, zn);
                 if (at_corner_or_not(current_i, current_j))
                 {
-                    Vector3 new_p = get_position_in_map_from_ij(current_i, current_j, zn);
-                    if(step <= total_step / 3)
+                    new_p = get_position_in_map_from_ij(current_i, current_j, zn);
+                    if (Vector3.Dot(old_p - old_old_p, new_p - old_p) == 0f)
                     {
-                        Debug.DrawLine(old_p, new_p, Color.red, 500f);
-                    }else if (step > total_step/3 && step <= total_step / 3 * 2)
-                    {
-                        Debug.DrawLine(old_p, new_p, Color.cyan, 500f);
+                        // check the 90 degree turns 
+                        new_p = (new_p + old_p) / 2;
+                        final_path.Add(new_p);
                     }
                     else
                     {
-                        Debug.DrawLine(old_p, new_p, Color.yellow, 500f);
+                        if (!final_path.Contains(old_p))
+                        {
+                            final_path.Add(old_p);
+                        }
                     }
+                    old_old_p = old_p;
+                    old_p = new_p;
                 }
-                final_path.Add(old_p);
-
             }
+
+            // draw the final path in cyan (light blue looks really good)
+            Vector3 p, np;
+            p = final_path[0];
+            for (int i = 1; i < final_path.Count; i++)
+            {
+                np = final_path[i];
+                Debug.DrawLine(p, np, Color.cyan, 500f);
+                p = np;
+            }
+
             Debug.Log("trajectory");
             print_map(trajectory, zn, xn);
             Debug.LogFormat("final path length: {0}", final_path.Count);
