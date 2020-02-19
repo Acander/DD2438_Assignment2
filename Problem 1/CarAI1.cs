@@ -14,8 +14,12 @@ namespace UnityStandardAssets.Vehicles.Car
     public class CarAI1 : MonoBehaviour
     {
         private CarController m_Car; // the car controller we want to use
+        /*private CarController m_Car2;
+        private CarController m_Car3;*/
         
         private PIDController pid_controller; // Used for making course corrections
+        /*private PIDController pid_controller2;
+        private PIDController pid_controller3;*/
         // Car information
         float car_radius = 3f;
         float L = 2.870426f;
@@ -25,8 +29,12 @@ namespace UnityStandardAssets.Vehicles.Car
         float max_v = 8;
         Vector3 fa_mid;
         Vector3 ra_mid;
-        private Boolean collision = false;
         
+        private Boolean collision = false;
+        /*private Boolean collision2 = false;
+        private Boolean collision3 = false;
+        
+        Stopwatch stopwatch1 = new Stopwatch();*/
         Stopwatch stopwatch = new Stopwatch();
 
         List<Vector3> final_path = new List<Vector3>();
@@ -45,7 +53,12 @@ namespace UnityStandardAssets.Vehicles.Car
 
             // note that both arrays will have holes when objects are destroyed
             // but for initial planning they should work
+            //How to know who is running the script
             friends = GameObject.FindGameObjectsWithTag("Player");
+            Debug.Log(friends[0].name == gameObject.name); 
+            Debug.Log(friends[0].name);
+            Debug.Log(gameObject.name);
+            
             // Note that you are not allowed to check the positions of the turrets in this problem
 
             int position_i = terrain_manager.myInfo.get_i_index(transform.position.x);
@@ -59,340 +72,358 @@ namespace UnityStandardAssets.Vehicles.Car
 
             // Plan your path here
             // get size of the terrian 
-            int xn = terrain_manager.myInfo.x_N;
-            int zn = terrain_manager.myInfo.z_N;
-            // construct new gridmap since the given one is in float type
-            int[][] gridmap = new int[zn][];
-            for (int i = 0; i < zn; i++)
+            if ("ArmedCar" == gameObject.name)
             {
-                gridmap[zn - 1 - i] = new int[xn];
-                for (int j = 0; j < xn; j++)
                 {
-                    gridmap[zn - 1 - i][j] = (int)terrain_manager.myInfo.traversability[j, i];
-                }
-            }
-
-            // below can be used to visualize the grip map: 1 means obstacle, 0 means no obstacle
-            // the red 0 indicates the starting point 
-            string lala = "";
-            for (int i = 0; i < zn; i++)
-            {
-                for (int j = 0; j < xn; j++)
-                {
-                    if(position_j==zn-i-1 && position_i == j)
+                    int xn = terrain_manager.myInfo.x_N;
+                    int zn = terrain_manager.myInfo.z_N;
+                    // construct new gridmap since the given one is in float type
+                    int[][] gridmap = new int[zn][];
+                    for (int i = 0; i < zn; i++)
                     {
-                        // the current position is red 
-                        lala += "<color=#800000ff>"+ gridmap[i][j].ToString() + "</color>" + ",";
-                    }
-                    else
-                    {
-                        lala += gridmap[i][j].ToString() + ",";
-                    }
-                }
-                lala += "\n";
-            }
-            Debug.Log(lala);
-
-            // vertex mapping has the same dimension as gridmap
-            // it contains index for each free(0) grid 
-            int[,] vertex_mapping = new int[zn, xn];
-            int num_free_spaces = 0;
-            for (int i = 0; i < zn; i++)
-            {
-                for (int j = 0; j < xn; j++)
-                {
-                    if (gridmap[i][j] == 0)
-                    {
-                        num_free_spaces += 1;
-                        vertex_mapping[i, j] = num_free_spaces;
-                    }
-                }
-            }
-            Debug.LogFormat("total free spaces: {0}",num_free_spaces);
-
-            // add all edges to a list 
-            List<Edge> edges = new List<Edge>();
-            for (int i = 0; i < zn; i++)
-            {
-                for (int j = 0; j < xn; j++)
-                {
-                    if (vertex_mapping[i, j] != 0)
-                    {
-                        // look right
-                        if (vertex_mapping[i, j + 1] != 0)
+                        gridmap[zn - 1 - i] = new int[xn];
+                        for (int j = 0; j < xn; j++)
                         {
-                            edges.Add(new Edge() { Vertex1 = vertex_mapping[i, j], Vertex2 = vertex_mapping[i, j + 1], Weight = 1 });
-                        }
-                        // look down 
-                        if (vertex_mapping[i + 1, j] != 0)
-                        {
-                            edges.Add(new Edge() { Vertex1 = vertex_mapping[i, j], Vertex2 = vertex_mapping[i + 1, j], Weight = 1 });
+                            gridmap[zn - 1 - i][j] = (int) terrain_manager.myInfo.traversability[j, i];
                         }
                     }
-                }
-            }
 
-            // init set of vertices
-            List<int> vertices = new List<int>();
-            for (int i = 0; i < num_free_spaces; i++)
-            {
-                vertices.Add(i + 1);
-            }
-
-            // get minimum spanning tree
-            List<Edge> MinimumSpanningTree = Kruskals_MST(edges, vertices);
-
-            int total_weight = 0;
-            foreach(Edge edge in MinimumSpanningTree)
-            {
-                total_weight += 1;
-                int v1_i = CoordinatesOf<int>(vertex_mapping, edge.Vertex1).Item1;
-                int v1_j = CoordinatesOf<int>(vertex_mapping, edge.Vertex1).Item2;
-                int v2_i = CoordinatesOf<int>(vertex_mapping, edge.Vertex2).Item1;
-                int v2_j = CoordinatesOf<int>(vertex_mapping, edge.Vertex2).Item2;
-                float v1_x = terrain_manager.myInfo.get_x_pos(v1_j);
-                float v1_z = terrain_manager.myInfo.get_z_pos(zn-1-v1_i);
-                float v2_x = terrain_manager.myInfo.get_x_pos(v2_j);
-                float v2_z = terrain_manager.myInfo.get_z_pos(zn-1-v2_i);
-                // draw blue lines along the edges of mst
-                Debug.DrawLine(new Vector3(v1_x, 0f, v1_z), new Vector3(v2_x, 0f, v2_z), Color.black, 500f);
-                //Debug.LogFormat("Vertex ({0},{1}) to Vertex ({2},{3}) weight is: {4}", v1_i, v1_j, v2_i, v2_j, edge.Weight);
-            }
-            Debug.LogFormat("minimum spanning tree weight: {0}", total_weight);
-
-            
-            // final_mapping expands the gridmap 3 times 
-            int[,] final_mapping = new int[3 * zn, 3 * xn];
-            for (int i = 0; i < zn; i++)
-            {
-                for (int j = 0; j < xn; j++)
-                {
-                    if (gridmap[i][j] == 1)
+                    // below can be used to visualize the grip map: 1 means obstacle, 0 means no obstacle
+                    // the red 0 indicates the starting point 
+                    string lala = "";
+                    for (int i = 0; i < zn; i++)
                     {
-                        for (int m = 3 * i; m <= 3 * i + 2; m++)
+                        for (int j = 0; j < xn; j++)
                         {
-                            for (int n = 3 * j; n <= 3 * j + 2; n++)
+                            if (position_j == zn - i - 1 && position_i == j)
                             {
-                                final_mapping[m, n] = 1;
+                                // the current position is red 
+                                lala += "<color=#800000ff>" + gridmap[i][j].ToString() + "</color>" + ",";
+                            }
+                            else
+                            {
+                                lala += gridmap[i][j].ToString() + ",";
+                            }
+                        }
+                        lala += "\n";
+                    }
+                    Debug.Log(lala);
+
+                    // vertex mapping has the same dimension as gridmap
+                    // it contains index for each free(0) grid 
+                    int[,] vertex_mapping = new int[zn, xn];
+                    int num_free_spaces = 0;
+                    for (int i = 0; i < zn; i++)
+                    {
+                        for (int j = 0; j < xn; j++)
+                        {
+                            if (gridmap[i][j] == 0)
+                            {
+                                num_free_spaces += 1;
+                                vertex_mapping[i, j] = num_free_spaces;
                             }
                         }
                     }
-                    else
-                    {
-                        final_mapping[3 * i + 1, 3 * j + 1] = 1;
-                        final_mapping[3 * i, 3 * j] = 0;
-                        final_mapping[3 * i, 3 * j + 2] = 0;
-                        final_mapping[3 * i + 2, 3 * j] = 0;
-                        final_mapping[3 * i + 2, 3 * j + 2] = 0;
-                        var hoho = judgement(MinimumSpanningTree, vertex_mapping, i, j);
-                        final_mapping[3 * i, 3 * j + 1] = hoho.Item1; //up
-                        final_mapping[3 * i + 2, 3 * j + 1] = hoho.Item2; //down
-                        final_mapping[3 * i + 1, 3 * j] = hoho.Item3; //left
-                        final_mapping[3 * i + 1, 3 * j + 2] = hoho.Item4; //right
-                    }
-                }
-            }
+                    Debug.LogFormat("total free spaces: {0}", num_free_spaces);
 
-            // total step in final mapping 
-            int total_step = 0;
-            for (int i = 0; i < 3 * zn; i++)
-            {
-                for(int j = 0; j < 3 * xn; j++)
-                {
-                    if (final_mapping[i, j] == 0)
+                    // add all edges to a list 
+                    List<Edge> edges = new List<Edge>();
+                    for (int i = 0; i < zn; i++)
                     {
-                        total_step += 1;
-                    }
-                }
-            }
-            Debug.LogFormat("total step is {0}", total_step);
-            print_map(final_mapping, zn, xn);
-
-            // find the start index on final_mapping
-            int start_i = 3*(zn-1-position_j);
-            int start_j = 3*(position_i);
-            if(transform.position.x < grid_center_x && transform.position.z < grid_center_z)
-            {
-                start_i += 1;
-                start_j -= 1;
-            }
-            if (transform.position.x < grid_center_x && transform.position.z > grid_center_z)
-            {
-                start_i -= 1;
-                start_j -= 1;
-            }
-            if (transform.position.x > grid_center_x && transform.position.z < grid_center_z)
-            {
-                start_i += 1;
-                start_j += 1;
-            }
-            if (transform.position.x > grid_center_x && transform.position.z > grid_center_z)
-            {
-                start_i -= 1;
-                start_j += 1;
-            }
-            int step = 2;
-
-            // constructing the final trajectory with [start_i,start_j]=2
-            // others are same as final mapping 
-            int[,] trajectory = new int[3 * zn, 3 * xn];
-            for (int i = 0; i < 3 * zn; i++)
-            {
-                for (int j = 0; j < 3 * xn; j++)
-                {
-                    if (i == start_i && j == start_j)
-                    {
-                        trajectory[i, j] = step;
-                    }
-                    else
-                    {
-                        trajectory[i, j] = final_mapping[i, j];
-                    }
-                }
-            }
-            //print_map(trajectory, zn, xn);
-
-            // current index is the first move to take
-            // start_i +/- 1 means go down/up
-            // start_j +/- 1 means go right/left
-            int current_i = start_i - 1;
-            int current_j = start_j;
-            Vector3 old_old_p, old_p, new_p;
-            old_old_p = transform.position;
-            // now this is hard-coded with the car going (0,0,1)
-            old_p = transform.position + Vector3.forward;
-            // the loop goes over every 0 value position in the trajectory
-            // and give a step value to each (i,j) pair in trajectory
-            while (true)
-            {
-                bool changed = false;
-                step += 1;
-                trajectory[current_i, current_j] = step;
-                //Debug.LogFormat("trajectory with step: {0}", step);
-                int up = trajectory[current_i - 1, current_j] == 0 ? 1 : 0;
-                int down = trajectory[current_i + 1, current_j] == 0 ? 1 : 0;
-                int left = trajectory[current_i, current_j - 1] == 0 ? 1 : 0;
-                int right = trajectory[current_i, current_j + 1] == 0 ? 1 : 0;
-                if (up + down + left + right == 0)
-                {
-                    // if there is no zero surrounding, then the loop is finished
-                    break;
-                }
-                if (up + down + left + right == 1)
-                {
-                    // if there is only zero nearby, just go to that zero
-                    if (up == 1)
-                    {
-                        current_i -= 1;
-                        changed = true;
-                    }
-                    if (down == 1)
-                    {
-                        changed = true;
-                        current_i += 1;
-                    }
-                    if (left == 1)
-                    {
-                        changed = true;
-                        current_j -= 1;
-                    }
-                    if (right == 1)
-                    {
-                        changed = true;
-                        current_j += 1;
-                    }
-                }
-                else
-                {
-                    // if there are more than one zeros around
-                    // go along with the spanning tree direction
-                    var hehe = judgement(MinimumSpanningTree, vertex_mapping, current_i / 3, current_j / 3);
-                    if (up == 1 && hehe.Item1 == 1)
-                    {
-                        changed = true;
-                        current_i -= 1;
-                    }
-                    if (down == 1 && hehe.Item2 == 1)
-                    {
-                        changed = true;
-                        current_i += 1;
-                    }
-                    if (left == 1 && hehe.Item3 == 1)
-                    {
-                        changed = true;
-                        current_j -= 1;
-                    }
-                    if (right == 1 && hehe.Item4 == 1)
-                    {
-                        changed = true;
-                        current_j += 1;
-                    }
-                }
-                if (!changed)
-                {
-                    // if still not changed, go to zero that lives in the same big grid as the current one
-                    int temp_i = current_i;
-                    int temp_j = current_j;
-                    if (up == 1 && (temp_i - 1) / 3 == temp_i / 3)
-                    {
-                        changed = true;
-                        current_i -= 1;
-                    }
-                    if (down == 1 && (temp_i + 1) / 3 == temp_i / 3)
-                    {
-                        changed = true;
-                        current_i += 1;
-                    }
-                    if (left == 1 && (temp_j - 1) / 3 == temp_j / 3)
-                    {
-                        changed = true;
-                        current_j -= 1;
-                    }
-                    if (right == 1 && (temp_j + 1) / 3 == temp_j / 3)
-                    {
-                        changed = true;
-                        current_j += 1;
-                    }
-                }
-                if (!changed)
-                {
-                    // this shall never be entered, but is here just in case
-                    break;
-                }
-                if (at_corner_or_not(current_i, current_j))
-                {
-                    new_p = get_position_in_map_from_ij(current_i, current_j, zn);
-                    if (Vector3.Dot(old_p - old_old_p, new_p - old_p) == 0f)
-                    {
-                        // check the 90 degree turns 
-                        new_p = (new_p + old_p) / 2;
-                        final_path.Add(new_p);
-                    }
-                    else
-                    {
-                        if (!final_path.Contains(old_p))
+                        for (int j = 0; j < xn; j++)
                         {
-                            final_path.Add(old_p);
+                            if (vertex_mapping[i, j] != 0)
+                            {
+                                // look right
+                                if (vertex_mapping[i, j + 1] != 0)
+                                {
+                                    edges.Add(new Edge()
+                                    {
+                                        Vertex1 = vertex_mapping[i, j],
+                                        Vertex2 = vertex_mapping[i, j + 1],
+                                        Weight = 1
+                                    });
+                                }
+                                // look down 
+                                if (vertex_mapping[i + 1, j] != 0)
+                                {
+                                    edges.Add(new Edge()
+                                    {
+                                        Vertex1 = vertex_mapping[i, j],
+                                        Vertex2 = vertex_mapping[i + 1, j],
+                                        Weight = 1
+                                    });
+                                }
+                            }
                         }
                     }
-                    old_old_p = old_p;
-                    old_p = new_p;
+
+                    // init set of vertices
+                    List<int> vertices = new List<int>();
+                    for (int i = 0; i < num_free_spaces; i++)
+                    {
+                        vertices.Add(i + 1);
+                    }
+
+                    // get minimum spanning tree
+                    List<Edge> MinimumSpanningTree = Kruskals_MST(edges, vertices);
+
+                    int total_weight = 0;
+                    foreach (Edge edge in MinimumSpanningTree)
+                    {
+                        total_weight += 1;
+                        int v1_i = CoordinatesOf<int>(vertex_mapping, edge.Vertex1).Item1;
+                        int v1_j = CoordinatesOf<int>(vertex_mapping, edge.Vertex1).Item2;
+                        int v2_i = CoordinatesOf<int>(vertex_mapping, edge.Vertex2).Item1;
+                        int v2_j = CoordinatesOf<int>(vertex_mapping, edge.Vertex2).Item2;
+                        float v1_x = terrain_manager.myInfo.get_x_pos(v1_j);
+                        float v1_z = terrain_manager.myInfo.get_z_pos(zn - 1 - v1_i);
+                        float v2_x = terrain_manager.myInfo.get_x_pos(v2_j);
+                        float v2_z = terrain_manager.myInfo.get_z_pos(zn - 1 - v2_i);
+                        // draw blue lines along the edges of mst
+                        Debug.DrawLine(new Vector3(v1_x, 0f, v1_z), new Vector3(v2_x, 0f, v2_z), Color.black, 500f);
+                        //Debug.LogFormat("Vertex ({0},{1}) to Vertex ({2},{3}) weight is: {4}", v1_i, v1_j, v2_i, v2_j, edge.Weight);
+                    }
+                    Debug.LogFormat("minimum spanning tree weight: {0}", total_weight);
+
+
+                    // final_mapping expands the gridmap 3 times 
+                    int[,] final_mapping = new int[3 * zn, 3 * xn];
+                    for (int i = 0; i < zn; i++)
+                    {
+                        for (int j = 0; j < xn; j++)
+                        {
+                            if (gridmap[i][j] == 1)
+                            {
+                                for (int m = 3 * i; m <= 3 * i + 2; m++)
+                                {
+                                    for (int n = 3 * j; n <= 3 * j + 2; n++)
+                                    {
+                                        final_mapping[m, n] = 1;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                final_mapping[3 * i + 1, 3 * j + 1] = 1;
+                                final_mapping[3 * i, 3 * j] = 0;
+                                final_mapping[3 * i, 3 * j + 2] = 0;
+                                final_mapping[3 * i + 2, 3 * j] = 0;
+                                final_mapping[3 * i + 2, 3 * j + 2] = 0;
+                                var hoho = judgement(MinimumSpanningTree, vertex_mapping, i, j);
+                                final_mapping[3 * i, 3 * j + 1] = hoho.Item1; //up
+                                final_mapping[3 * i + 2, 3 * j + 1] = hoho.Item2; //down
+                                final_mapping[3 * i + 1, 3 * j] = hoho.Item3; //left
+                                final_mapping[3 * i + 1, 3 * j + 2] = hoho.Item4; //right
+                            }
+                        }
+                    }
+
+                    // total step in final mapping 
+                    int total_step = 0;
+                    for (int i = 0; i < 3 * zn; i++)
+                    {
+                        for (int j = 0; j < 3 * xn; j++)
+                        {
+                            if (final_mapping[i, j] == 0)
+                            {
+                                total_step += 1;
+                            }
+                        }
+                    }
+                    Debug.LogFormat("total step is {0}", total_step);
+                    print_map(final_mapping, zn, xn);
+
+                    // find the start index on final_mapping
+                    int start_i = 3 * (zn - 1 - position_j);
+                    int start_j = 3 * (position_i);
+                    if (transform.position.x < grid_center_x && transform.position.z < grid_center_z)
+                    {
+                        start_i += 1;
+                        start_j -= 1;
+                    }
+                    if (transform.position.x < grid_center_x && transform.position.z > grid_center_z)
+                    {
+                        start_i -= 1;
+                        start_j -= 1;
+                    }
+                    if (transform.position.x > grid_center_x && transform.position.z < grid_center_z)
+                    {
+                        start_i += 1;
+                        start_j += 1;
+                    }
+                    if (transform.position.x > grid_center_x && transform.position.z > grid_center_z)
+                    {
+                        start_i -= 1;
+                        start_j += 1;
+                    }
+                    int step = 2;
+
+                    // constructing the final trajectory with [start_i,start_j]=2
+                    // others are same as final mapping 
+                    int[,] trajectory = new int[3 * zn, 3 * xn];
+                    for (int i = 0; i < 3 * zn; i++)
+                    {
+                        for (int j = 0; j < 3 * xn; j++)
+                        {
+                            if (i == start_i && j == start_j)
+                            {
+                                trajectory[i, j] = step;
+                            }
+                            else
+                            {
+                                trajectory[i, j] = final_mapping[i, j];
+                            }
+                        }
+                    }
+                    //print_map(trajectory, zn, xn);
+
+                    // current index is the first move to take
+                    // start_i +/- 1 means go down/up
+                    // start_j +/- 1 means go right/left
+                    int current_i = start_i - 1;
+                    int current_j = start_j;
+                    Vector3 old_old_p, old_p, new_p;
+                    old_old_p = transform.position;
+                    // now this is hard-coded with the car going (0,0,1)
+                    old_p = transform.position + Vector3.forward;
+                    // the loop goes over every 0 value position in the trajectory
+                    // and give a step value to each (i,j) pair in trajectory
+                    while (true)
+                    {
+                        bool changed = false;
+                        step += 1;
+                        trajectory[current_i, current_j] = step;
+                        //Debug.LogFormat("trajectory with step: {0}", step);
+                        int up = trajectory[current_i - 1, current_j] == 0 ? 1 : 0;
+                        int down = trajectory[current_i + 1, current_j] == 0 ? 1 : 0;
+                        int left = trajectory[current_i, current_j - 1] == 0 ? 1 : 0;
+                        int right = trajectory[current_i, current_j + 1] == 0 ? 1 : 0;
+                        if (up + down + left + right == 0)
+                        {
+                            // if there is no zero surrounding, then the loop is finished
+                            break;
+                        }
+                        if (up + down + left + right == 1)
+                        {
+                            // if there is only zero nearby, just go to that zero
+                            if (up == 1)
+                            {
+                                current_i -= 1;
+                                changed = true;
+                            }
+                            if (down == 1)
+                            {
+                                changed = true;
+                                current_i += 1;
+                            }
+                            if (left == 1)
+                            {
+                                changed = true;
+                                current_j -= 1;
+                            }
+                            if (right == 1)
+                            {
+                                changed = true;
+                                current_j += 1;
+                            }
+                        }
+                        else
+                        {
+                            // if there are more than one zeros around
+                            // go along with the spanning tree direction
+                            var hehe = judgement(MinimumSpanningTree, vertex_mapping, current_i / 3, current_j / 3);
+                            if (up == 1 && hehe.Item1 == 1)
+                            {
+                                changed = true;
+                                current_i -= 1;
+                            }
+                            if (down == 1 && hehe.Item2 == 1)
+                            {
+                                changed = true;
+                                current_i += 1;
+                            }
+                            if (left == 1 && hehe.Item3 == 1)
+                            {
+                                changed = true;
+                                current_j -= 1;
+                            }
+                            if (right == 1 && hehe.Item4 == 1)
+                            {
+                                changed = true;
+                                current_j += 1;
+                            }
+                        }
+                        if (!changed)
+                        {
+                            // if still not changed, go to zero that lives in the same big grid as the current one
+                            int temp_i = current_i;
+                            int temp_j = current_j;
+                            if (up == 1 && (temp_i - 1) / 3 == temp_i / 3)
+                            {
+                                changed = true;
+                                current_i -= 1;
+                            }
+                            if (down == 1 && (temp_i + 1) / 3 == temp_i / 3)
+                            {
+                                changed = true;
+                                current_i += 1;
+                            }
+                            if (left == 1 && (temp_j - 1) / 3 == temp_j / 3)
+                            {
+                                changed = true;
+                                current_j -= 1;
+                            }
+                            if (right == 1 && (temp_j + 1) / 3 == temp_j / 3)
+                            {
+                                changed = true;
+                                current_j += 1;
+                            }
+                        }
+                        if (!changed)
+                        {
+                            // this shall never be entered, but is here just in case
+                            break;
+                        }
+                        if (at_corner_or_not(current_i, current_j))
+                        {
+                            new_p = get_position_in_map_from_ij(current_i, current_j, zn);
+                            if (Vector3.Dot(old_p - old_old_p, new_p - old_p) == 0f)
+                            {
+                                // check the 90 degree turns 
+                                new_p = (new_p + old_p) / 2;
+                                final_path.Add(new_p);
+                            }
+                            else
+                            {
+                                if (!final_path.Contains(old_p))
+                                {
+                                    final_path.Add(old_p);
+                                }
+                            }
+                            old_old_p = old_p;
+                            old_p = new_p;
+                        }
+                    }
+
+                    // draw the final path in cyan (light blue looks really good)
+                    Vector3 p, np;
+                    p = final_path[0];
+                    for (int i = 1; i < final_path.Count; i++)
+                    {
+                        np = final_path[i];
+                        Debug.DrawLine(p, np, Color.cyan, 500f);
+                        p = np;
+                    }
+
+                    Debug.Log("trajectory");
+                    print_map(trajectory, zn, xn);
+                    Debug.LogFormat("final path length: {0}", final_path.Count);
                 }
             }
+            GameObject mainCar = GameObject.Find("ArmedCar");
 
-            // draw the final path in cyan (light blue looks really good)
-            Vector3 p, np;
-            p = final_path[0];
-            for (int i = 1; i < final_path.Count; i++)
-            {
-                np = final_path[i];
-                Debug.DrawLine(p, np, Color.cyan, 500f);
-                p = np;
-            }
-
-            Debug.Log("trajectory");
-            print_map(trajectory, zn, xn);
-            Debug.LogFormat("final path length: {0}", final_path.Count);
+            final_path = mainCar.GetComponent<CarAI1>().final_path;
             
             //final_path.Insert(0, start_pos);
             var theta = transform.eulerAngles.y;
