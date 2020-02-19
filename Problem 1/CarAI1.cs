@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Diagnostics;
 using KruskalMinimumSpanningTree;
 using System.Linq;
+using Scrips;
+using Debug = UnityEngine.Debug;
 
 namespace UnityStandardAssets.Vehicles.Car
 {
@@ -18,11 +21,14 @@ namespace UnityStandardAssets.Vehicles.Car
         float L = 2.870426f;
         float L_f;
         float L_b;
-        float max_throttle = 0.3f;
+        float max_throttle = 1f;
         float max_v = 8;
         Vector3 fa_mid;
         Vector3 ra_mid;
+        private Boolean collision = false;
         
+        Stopwatch stopwatch = new Stopwatch();
+
         List<Vector3> final_path = new List<Vector3>();
 
         public GameObject terrain_manager_game_object;
@@ -619,34 +625,70 @@ namespace UnityStandardAssets.Vehicles.Car
             //Debug.Log("Steering:" + steering + " Acceleration:" + acceleration);
             //m_Car.Move(0f, 0.5f, 0f, 0f);
             */
-            var theta = transform.eulerAngles.y;
-            fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-            ra_mid = transform.position - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-            var act_fa_mid = m_Car.m_WheelMeshes[0].transform.position + (m_Car.m_WheelMeshes[1].transform.position - m_Car.m_WheelMeshes[0].transform.position) / 2;
-            var act_ra_mid = m_Car.m_WheelMeshes[2].transform.position + (m_Car.m_WheelMeshes[3].transform.position - m_Car.m_WheelMeshes[2].transform.position) / 2;
-
-            
-            // Draw line from front axel mid to target
-            var target = final_path[pid_controller.current];
-            var target_vec = target;
-            Debug.DrawLine(fa_mid, target_vec, Color.blue);
-
-            // Draw CTE line
-            var progress = pid_controller.get_progress_point(fa_mid);
-            //Debug.DrawLine(fa_mid, progress, Color.red);
-            
-            var throttle = max_throttle;
-            var target_vel = 2f;
-            var velocity = GetComponent<Rigidbody>().velocity.magnitude;
-            if (velocity > target_vel)
+            if (pid_controller.check_Should_Reverse(transform.position, transform.forward) || collision)
             {
-                throttle = 0;
+                if (collision)
+                {
+                    //Check if we have 'cleared'
+                    if (stopwatch.ElapsedMilliseconds > 1000)
+                    {
+                        collision = false;
+                        stopwatch.Stop();
+                        stopwatch.Reset();
+                    }
+                }
+                Debug.Log("Reversing!!!!!!!!");
+                var localVel = transform.InverseTransformDirection(GetComponent<Rigidbody>().velocity);
+                float forwardSpeed = localVel.z; //Negative speed means it is reversing
+                NextMove nextMove = pid_controller.reverse_Routine(forwardSpeed, transform.position, transform.right);
+                m_Car.Move(nextMove.steeringAngle, nextMove.throttle, nextMove.footBrake, nextMove.handBrake);
             }
+            else
+            {
+                Debug.Log("Heading for next target!!!!!!!!!!!!");
+                var theta = transform.eulerAngles.y;
+                fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+                ra_mid = transform.position - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+                var act_fa_mid = m_Car.m_WheelMeshes[0].transform.position +
+                                 (m_Car.m_WheelMeshes[1].transform.position - m_Car.m_WheelMeshes[0].transform.position) /
+                                 2;
+                var act_ra_mid = m_Car.m_WheelMeshes[2].transform.position +
+                                 (m_Car.m_WheelMeshes[3].transform.position - m_Car.m_WheelMeshes[2].transform.position) /
+                                 2;
 
-            Debug.LogFormat("Here am I now: {0}", transform.position);
-            var steer = pid_controller.get_controls(fa_mid, transform.right);
-            //UnityEngine.Debug.Log("steer = " + steer);
-            m_Car.Move(steer, throttle, 0f, 0f);
+
+                // Draw line from front axel mid to target
+                var target = final_path[pid_controller.current];
+                var target_vec = target;
+                Debug.DrawLine(fa_mid, target_vec, Color.blue);
+
+                // Draw CTE line
+                var progress = pid_controller.get_progress_point(fa_mid);
+                //Debug.DrawLine(fa_mid, progress, Color.red);
+
+                //Debug.DrawLine(fa_mid, final_path[pid_controller.current - 1], Color.green);
+
+                var throttle = max_throttle;
+                var target_vel = 10f; //2f
+                var velocity = GetComponent<Rigidbody>().velocity.magnitude;
+                if (velocity > target_vel)
+                {
+                    throttle = 0;
+                }
+
+                //Debug.LogFormat("Here am I now: {0}", transform.position);
+                var steer = pid_controller.get_controls(fa_mid, transform.right);
+                //UnityEngine.Debug.Log("steer = " + steer);
+                m_Car.Move(steer, throttle, 0f, 0f);
+            }
+            //m_Car.Move(0f, -1f, 0f, 0f);
+
+        }
+
+        private void OnCollisionEnter()
+        {
+            collision = true;
+            stopwatch.Start();
         }
     }
 }
