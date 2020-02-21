@@ -98,3 +98,5 @@ start at, i:5, j:3
 1    1    1    1    1    1    1    1      
 current convex cover boundaries, up:5, down:6, left:3, right:6
 convex cover boundary has size:6
+## Done
+Now that every free space of the original map is covered by at least one convex cover, the process stops. In Unity, the List<Tuple<int,int,int,int>> variable convex_cover_boundary contains the something like "up:1, down:8, left:6, right:6". Each colors square shown in Unity covers the "0" spaces in that particular convex cover. 
