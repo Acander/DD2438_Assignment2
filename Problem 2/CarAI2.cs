@@ -23,36 +23,46 @@ namespace UnityStandardAssets.Vehicles.Car
             m_Car = GetComponent<CarController>();
             terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
 
-
             // note that both arrays will have holes when objects are destroyed
             // but for initial planning they should work
             friends = GameObject.FindGameObjectsWithTag("Player");
             // Note that you are not allowed to check the positions of the turrets in this problem
 
-
-
             // Plan your path here
-            // ...
 
             // get size of the terrian 
             int xn = terrain_manager.myInfo.x_N;
             int zn = terrain_manager.myInfo.z_N;
-            // construct new gridmap since the given one is in float type
+
+            //Init Data Structures
             int[][] map = new int[zn][];
             int[][] occupancy_map = new int[zn][];
+            List<Tuple<int, int, int, int>> convex_cover_boundary = new List<Tuple<int, int, int, int>>();
 
+            createNewIntGridMap(xn, zn, map, occupancy_map);
+            printGridMap(xn, zn, map);
+            storeTheFourBoundriesOfAllConvexCover(occupancy_map, map, convex_cover_boundary);
+            checkThatConvexCoversAreNotPartOfObstacles(convex_cover_boundary, map);
+            drawConvexSet(convex_cover_boundary, zn);
+        }
+
+        private void createNewIntGridMap(int xn, int zn, int[][] map, int[][] occupancy_map)
+        {
             for (int i = 0; i < zn; i++)
             {
                 map[zn - 1 - i] = new int[xn];
                 occupancy_map[zn - 1 - i] = new int[xn];
                 for (int j = 0; j < xn; j++)
                 {
-                    map[zn - 1 - i][j] = (int)terrain_manager.myInfo.traversability[j, i];
-                    occupancy_map[zn - 1 - i][j] = (int)terrain_manager.myInfo.traversability[j, i];
+                    map[zn - 1 - i][j] = (int) terrain_manager.myInfo.traversability[j, i];
+                    occupancy_map[zn - 1 - i][j] = (int) terrain_manager.myInfo.traversability[j, i];
                 }
             }
+        }
 
-            // print map 
+
+        private void printGridMap(int xn, int zn, int[][] map)
+        {
             int free_spaces = 0;
             Debug.Log("original map");
             string original_map = "";
@@ -60,7 +70,7 @@ namespace UnityStandardAssets.Vehicles.Car
             {
                 for (int j = 0; j < xn; j++)
                 {
-                    original_map += map[i][j].ToString()+",";
+                    original_map += map[i][j].ToString() + ",";
                     if (map[i][j] == 0)
                     {
                         free_spaces += 1;
@@ -68,12 +78,17 @@ namespace UnityStandardAssets.Vehicles.Car
                 }
                 original_map += "\n";
             }
+
             Debug.Log(original_map);
             Debug.LogFormat("total free spaces: {0}", free_spaces);
-            int n_cover = 2;
+        }
+
+        private void storeTheFourBoundriesOfAllConvexCover(int[][] occupancy_map, int[][] map,
+            List<Tuple<int, int, int, int>> convex_cover_boundary)
+        {
             // store the four boundaries for convex covers
             // up, down, left, right
-            List<Tuple<int, int, int, int>> convex_cover_boundary = new List<Tuple<int, int, int, int>>();
+            int n_cover = 2;
             while (!check_free_spaces(occupancy_map))
             {
                 Debug.LogFormat("current convex cover index is {0}", n_cover);
@@ -115,34 +130,10 @@ namespace UnityStandardAssets.Vehicles.Car
                         right += 1;
                     }
                 }
-                Debug.LogFormat("current convex cover boundaries, up:{0}, down:{1}, left:{2}, right:{3}", up, down, left, right);
+                Debug.LogFormat("current convex cover boundaries, up:{0}, down:{1}, left:{2}, right:{3}", up, down, left,
+                    right);
                 convex_cover_boundary.Add(Tuple.Create(up, down, left, right));
                 n_cover += 1;
-            }
-            Debug.LogFormat("convex cover boundary has size:{0}", convex_cover_boundary.Count);
-            for (int i = 0; i < convex_cover_boundary.Count; i++)
-            {
-                var hehe = convex_cover_boundary[i];
-                if (map[hehe.Item1][hehe.Item3] == 1 || map[hehe.Item1][hehe.Item4] == 1 || map[hehe.Item2][hehe.Item3] == 1 || map[hehe.Item2][hehe.Item4] == 1)
-                {
-                    Debug.LogFormat("error with index:{0}", i);
-                }
-            }
-            float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
-            float z_step = (terrain_manager.myInfo.z_high - terrain_manager.myInfo.z_low) / terrain_manager.myInfo.z_N;
-            for (int i = 0; i < convex_cover_boundary.Count; i++)
-            {
-                var hehe = convex_cover_boundary[i];
-                var color_list = new List<Color> { Color.black, Color.cyan, Color.red, Color.yellow, Color.white };
-                int random_index = UnityEngine.Random.Range(0, color_list.Count);
-                Vector3 up_left = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item3)-x_step/2, 0f, terrain_manager.myInfo.get_x_pos(zn-1-hehe.Item1)+z_step/2);
-                Vector3 up_right = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item4) + x_step / 2, 0f, terrain_manager.myInfo.get_x_pos(zn-1-hehe.Item1) + z_step / 2);
-                Vector3 down_left = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item3) - x_step / 2, 0f, terrain_manager.myInfo.get_x_pos(zn-1-hehe.Item2) - z_step / 2);
-                Vector3 down_right = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item4) + x_step / 2, 0f, terrain_manager.myInfo.get_x_pos(zn-1-hehe.Item2) - z_step / 2);
-                Debug.DrawLine(up_left, up_right, color_list[random_index], 100f);
-                Debug.DrawLine(up_right, down_right, color_list[random_index], 100f);
-                Debug.DrawLine(down_right, down_left, color_list[random_index], 100f);
-                Debug.DrawLine(down_left, up_left, color_list[random_index], 100f);
             }
         }
 
@@ -206,7 +197,8 @@ namespace UnityStandardAssets.Vehicles.Car
             return result;
         }
 
-        public static void print_update_map(int[][] map, int[][] occupancy_map, int up, int down, int left, int right, int value)
+        public static void print_update_map(int[][] map, int[][] occupancy_map, int up, int down, int left, int right,
+            int value)
         {
             int zn = map.Length;
             int xn = map[0].Length;
@@ -230,6 +222,45 @@ namespace UnityStandardAssets.Vehicles.Car
             Debug.Log(update_map);
         }
 
+        private void checkThatConvexCoversAreNotPartOfObstacles(List<Tuple<int, int, int, int>> convex_cover_boundary,
+            int[][] map)
+        {
+            Debug.LogFormat("convex cover boundary has size:{0}", convex_cover_boundary.Count);
+            for (int i = 0; i < convex_cover_boundary.Count; i++)
+            {
+                var hehe = convex_cover_boundary[i];
+                if (map[hehe.Item1][hehe.Item3] == 1 || map[hehe.Item1][hehe.Item4] == 1 ||
+                    map[hehe.Item2][hehe.Item3] == 1 || map[hehe.Item2][hehe.Item4] == 1)
+                {
+                    Debug.LogFormat("error with index:{0}", i);
+                }
+            }
+        }
+
+        private void drawConvexSet(List<Tuple<int, int, int, int>> convex_cover_boundary, int zn)
+        {
+            float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
+            float z_step = (terrain_manager.myInfo.z_high - terrain_manager.myInfo.z_low) / terrain_manager.myInfo.z_N;
+            for (int i = 0; i < convex_cover_boundary.Count; i++)
+            {
+                var hehe = convex_cover_boundary[i];
+                var color_list = new List<Color> {Color.black, Color.cyan, Color.red, Color.yellow, Color.white};
+                int random_index = UnityEngine.Random.Range(0, color_list.Count);
+                Vector3 up_left = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item3) - x_step / 2, 0f,
+                    terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item1) + z_step / 2);
+                Vector3 up_right = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item4) + x_step / 2, 0f,
+                    terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item1) + z_step / 2);
+                Vector3 down_left = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item3) - x_step / 2, 0f,
+                    terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item2) - z_step / 2);
+                Vector3 down_right = new Vector3(terrain_manager.myInfo.get_x_pos(hehe.Item4) + x_step / 2, 0f,
+                    terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item2) - z_step / 2);
+                Debug.DrawLine(up_left, up_right, color_list[random_index], 100f);
+                Debug.DrawLine(up_right, down_right, color_list[random_index], 100f);
+                Debug.DrawLine(down_right, down_left, color_list[random_index], 100f);
+                Debug.DrawLine(down_left, up_left, color_list[random_index], 100f);
+            }
+        }
+
 
         private void FixedUpdate()
         {
@@ -246,8 +277,6 @@ namespace UnityStandardAssets.Vehicles.Car
             Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z));
             // this is how you control the car
             //m_Car.Move(0f, -1f, 1f, 0f);
-
-
         }
     }
 }
