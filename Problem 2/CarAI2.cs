@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.Diagnostics;
+using System.Linq;
 using KruskalMinimumSpanningTree;
+using Scrips;
 using Unity.Collections.LowLevel.Unsafe;
 using Debug = UnityEngine.Debug;
 
@@ -40,6 +42,10 @@ namespace UnityStandardAssets.Vehicles.Car
         public List<Vector3> finalPath = new List<Vector3>();
         //public List<Vector3> final_pathB = new List<Vector3>();
         //public List<Vector3> final_pathC = new List<Vector3>();
+        
+        //To do with planning final path
+        private PathFinder pathFinder = new PathFinder();
+        private TraversabilityManager traversabilityManager;
 
         public GameObject terrain_manager_game_object;
         public TerrainManager terrain_manager;
@@ -95,31 +101,109 @@ namespace UnityStandardAssets.Vehicles.Car
             solveTSPNaive(convexPoints, tspPath, fa_mid);
             
             //4) Plan a final path traversal___________________________________________________________________________
+            planPath(tspPath);
             
-            
+            //5 Prepare for set of_____________________________________________________________________________________
+            pid_controller = new PIDController(finalPath, m_Car.m_MaximumSteerAngle);
         }
 
         
         private void FixedUpdate()
         {
-            // Execute your path here
-            // ...
+            
+            if (pid_controller.check_Should_Reverse(transform.position, transform.forward) || collision)
+            {
+                if (collision)
+                {
+                    //Check if we have 'cleared'
+                    if (stopwatch.ElapsedMilliseconds > 1000)
+                    {
+                        collision = false;
+                        stopwatch.Stop();
+                        stopwatch.Reset();
+                    }
+                }
+                Debug.Log("Reversing!!!!!!!!");
+                var localVel = transform.InverseTransformDirection(GetComponent<Rigidbody>().velocity);
+                float forwardSpeed = localVel.z; //Negative speed means it is reversing
+                NextMove nextMove = pid_controller.reverse_Routine(forwardSpeed, transform.position, transform.right);
+                m_Car.Move(nextMove.steeringAngle, nextMove.throttle, nextMove.footBrake, nextMove.handBrake);
+            }
+            else
+            {
+                Debug.Log("Heading for next target!!!!!!!!!!!!");
+                var theta = transform.eulerAngles.y;
+                fa_mid = transform.position + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+                ra_mid = transform.position - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
+                var act_fa_mid = m_Car.m_WheelMeshes[0].transform.position +
+                                 (m_Car.m_WheelMeshes[1].transform.position -
+                                  m_Car.m_WheelMeshes[0].transform.position) /
+                                 2;
+                var act_ra_mid = m_Car.m_WheelMeshes[2].transform.position +
+                                 (m_Car.m_WheelMeshes[3].transform.position -
+                                  m_Car.m_WheelMeshes[2].transform.position) /
+                                 2;
 
 
-            // this is how you access information about the terrain
-            int i = terrain_manager.myInfo.get_i_index(transform.position.x);
-            int j = terrain_manager.myInfo.get_j_index(transform.position.z);
-            float grid_center_x = terrain_manager.myInfo.get_x_pos(i);
-            float grid_center_z = terrain_manager.myInfo.get_z_pos(j);
+                // Draw line from front axel mid to target
+                var target = finalPath[pid_controller.current];
+                var target_vec = target;
+                Debug.DrawLine(fa_mid, target_vec, Color.blue);
 
-            Debug.DrawLine(transform.position, new Vector3(grid_center_x, 0f, grid_center_z));
-            // this is how you control the car
-            //m_Car.Move(0f, -1f, 1f, 0f);
+                // Draw CTE line
+                var progress = pid_controller.get_progress_point(fa_mid);
+                //Debug.DrawLine(fa_mid, progress, Color.red);
+
+                //Debug.DrawLine(fa_mid, final_path[pid_controller.current - 1], Color.green);
+
+                var throttle = max_throttle;
+                var target_vel = 10f; //2f
+                var velocity = GetComponent<Rigidbody>().velocity.magnitude;
+                if (velocity > target_vel)
+                {
+                    throttle = 0;
+                }
+
+                //Debug.LogFormat("Here am I now: {0}", transform.position);
+                var steer = pid_controller.get_controls(fa_mid, transform.right);
+                //UnityEngine.Debug.Log("steer = " + steer);
+                m_Car.Move(steer, throttle, 0f, 0f);
+            }
+        }
+
+        private void OnCollisionEnter()
+        {
+            collision = true;
+            stopwatch.Start();
         }
 
         private void OnDrawGizmos()
         {
-            throw new NotImplementedException();
+            // Draw traverability
+            for (int i = 0; i < traversabilityManager.n_x; i++)
+            {
+                for (int j = 0; j < traversabilityManager.n_z; j++)
+                {
+                    float x = traversabilityManager.get_x_pos(i), z = traversabilityManager.get_z_pos(j);
+                    Vector3 center = new Vector3(x, 0, z);
+                    Gizmos.color = Color.blue;
+                    Gizmos.DrawWireCube(center, new Vector3(traversabilityManager.grid_x, 0, traversabilityManager.grid_z));
+                    if (!traversabilityManager.traversableCS[i, j])
+                    {
+                        Gizmos.color = Color.red;
+                    }
+                    Gizmos.DrawSphere(center, 0.3f);
+                }
+            }
+            
+            // Draw path and trajectories along path
+            for (int i = 0; i < finalPath.Count-1; i++)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(finalPath[i], 5f);
+                Gizmos.DrawLine(finalPath[i], finalPath[i+1]);
+            }
+            Gizmos.DrawSphere(finalPath[finalPath.Count-1], 5f);
         }
 
 
@@ -387,5 +471,19 @@ namespace UnityStandardAssets.Vehicles.Car
             }
         }
         
+        //4 Support functions for path planning and construction_______________________________________________________
+        private void planPath(List<Vector3> tspPath)
+        {
+            traversabilityManager = new TraversabilityManager(terrain_manager, car_radius);
+
+            finalPath.Add(tspPath[0]);
+            tspPath.RemoveAt(0);
+            foreach (var convexCenter in tspPath)
+            {
+                finalPath.AddRange(pathFinder.FindPath(traversabilityManager.traversableCS, fa_mid, convexCenter, traversabilityManager, m_Car.m_MaximumSteerAngle, L, max_v));
+            }
+        }
+        
+        //FixedUpdate support functions________________________________________________________________________________
     }
 }
