@@ -45,8 +45,8 @@ namespace Scrips
             var x_res = x_range / terrain_manager.myInfo.x_N;
             var z_res = z_range / terrain_manager.myInfo.z_N;
             // We want grid of to be ≈ 3 x 3
-            grid_x = determine_grid_size(x_res, 2);
-            grid_z = determine_grid_size(z_res, 2);
+            grid_x = determine_grid_size(x_res, 8f);
+            grid_z = determine_grid_size(z_res, 8f);
 
             // Get grid hypotenuse
             grid_hype = Convert.ToSingle(Math.Sqrt(Math.Pow(grid_x, 2) + Math.Pow(grid_z, 2)));

@@ -23,7 +23,7 @@ namespace UnityStandardAssets.Vehicles.Car
         /*private PIDController pid_controller2;
         private PIDController pid_controller3;*/
         // Car information
-        private float car_radius = 3f;
+        private float car_radius = 5f;
         private float L = 2.870426f;
         private float L_f;
         private float L_b;
@@ -39,6 +39,8 @@ namespace UnityStandardAssets.Vehicles.Car
         Stopwatch stopwatch1 = new Stopwatch();*/
         private Stopwatch stopwatch = new Stopwatch();
 
+        List<Vector3> convexPoints = new List<Vector3>();
+        List<Vector3> tspPath = new List<Vector3>();
         public List<Vector3> finalPath = new List<Vector3>();
         //public List<Vector3> final_pathB = new List<Vector3>();
         //public List<Vector3> final_pathC = new List<Vector3>();
@@ -84,9 +86,11 @@ namespace UnityStandardAssets.Vehicles.Car
             
             //2) Create a set of minimum points that give maximum exposition___________________________________________
             //Init data structures
-            List<Vector3> convexPoints = new List<Vector3>();
+            //List<Vector3> convexPoints = new List<Vector3>();
             
-            selectPointsFromConvexCover(convex_cover_boundary, zn, convexPoints);
+            selectPointsFromConvexCover(convex_cover_boundary, zn);
+            Debug.LogFormat("Number of ConvexPoints: {0}", convexPoints.Count);
+            Debug.Log("Number of ConvexPoints: ----------------------------------------");
             
             //3) Solve the travelling salesman problem_________________________________________________________________
             //Init variables
@@ -96,15 +100,21 @@ namespace UnityStandardAssets.Vehicles.Car
             fa_mid.y = 0;
             
             //Init data structures
-            List<Vector3> tspPath = new List<Vector3>();
-            
+
             solveTSPNaive(convexPoints, tspPath, fa_mid);
+            Debug.Log(tspPath.Count);
             
             //4) Plan a final path traversal___________________________________________________________________________
+            traversabilityManager = new TraversabilityManager(terrain_manager, car_radius);
             planPath(tspPath);
+            Debug.Log(finalPath.Count);
+            //finalPath = tspPath;
+            
             
             //5 Prepare for set of_____________________________________________________________________________________
             pid_controller = new PIDController(finalPath, m_Car.m_MaximumSteerAngle);
+            
+            //Debug.Log(pid_controller.current);
         }
 
         
@@ -169,6 +179,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 //UnityEngine.Debug.Log("steer = " + steer);
                 m_Car.Move(steer, throttle, 0f, 0f);
             }
+            //m_Car.Move(0f, 0f, 0f, 0f);
         }
 
         private void OnCollisionEnter()
@@ -180,30 +191,48 @@ namespace UnityStandardAssets.Vehicles.Car
         private void OnDrawGizmos()
         {
             // Draw traverability
-            for (int i = 0; i < traversabilityManager.n_x; i++)
+            /*for (int i = 0; i < traversabilityManager.n_x; i++)
             {
                 for (int j = 0; j < traversabilityManager.n_z; j++)
                 {
                     float x = traversabilityManager.get_x_pos(i), z = traversabilityManager.get_z_pos(j);
                     Vector3 center = new Vector3(x, 0, z);
                     Gizmos.color = Color.blue;
-                    Gizmos.DrawWireCube(center, new Vector3(traversabilityManager.grid_x, 0, traversabilityManager.grid_z));
+                    //Gizmos.DrawWireCube(center, new Vector3(traversabilityManager.grid_x, 0, traversabilityManager.grid_z));
                     if (!traversabilityManager.traversableCS[i, j])
                     {
                         Gizmos.color = Color.red;
                     }
-                    Gizmos.DrawSphere(center, 0.3f);
+                    Gizmos.DrawSphere(center, 2f);
                 }
-            }
+            }*/
             
             // Draw path and trajectories along path
             for (int i = 0; i < finalPath.Count-1; i++)
             {
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawSphere(finalPath[i], 5f);
+                Gizmos.DrawSphere(finalPath[i], 2f);
                 Gizmos.DrawLine(finalPath[i], finalPath[i+1]);
             }
             Gizmos.DrawSphere(finalPath[finalPath.Count-1], 5f);
+            
+            //Draw all mini goals
+            for (int i = 0; i < tspPath.Count-1; i++)
+            {
+                Gizmos.color = Color.blue;
+                Gizmos.DrawSphere(tspPath[i], 5f);
+                //Gizmos.DrawLine(tspPath[i], tspPath[i+1]);
+            }
+            Gizmos.DrawSphere(tspPath[tspPath.Count-1], 5f);
+            
+            //Draw all convex centers
+            /*for (int i = 0; i < convexPoints.Count; i++)
+            {
+                Gizmos.color = Color.red;
+                Gizmos.DrawSphere(convexPoints[i], 5f);
+                //Gizmos.DrawLine(tspPath[i], tspPath[i+1]);
+            }
+            //Gizmos.DrawSphere(tspPath[tspPath.Count-1], 5f);*/
         }
 
 
@@ -427,7 +456,7 @@ namespace UnityStandardAssets.Vehicles.Car
 
         //2) Support functions for finding min set of points___________________________________________________________
 
-        private void selectPointsFromConvexCover(List<Tuple<int, int, int, int>> convex_cover_boundary, int zn, List<Vector3> convexPoints)
+        private void selectPointsFromConvexCover(List<Tuple<int, int, int, int>> convex_cover_boundary, int zn)
         {
             //Select centerpoint of each rectangle
             float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
@@ -440,6 +469,7 @@ namespace UnityStandardAssets.Vehicles.Car
                 float z_center = (terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item2) - z_step / 2 +
                  terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item1) + z_step / 2) / 2;
                 
+                Debug.LogFormat("Center point x: {0}, y: {1}", x_center, z_center);
                 convexPoints.Add(new Vector3(x_center, 0f, z_center));
             }
             
@@ -448,7 +478,7 @@ namespace UnityStandardAssets.Vehicles.Car
         //3) Support functions for solving traveling salesman problem__________________________________________________
         private void solveTSPNaive(List<Vector3> convexPoints, List<Vector3> tspPath, Vector3 startPos)
         {
-            tspPath.Add(startPos);
+            //tspPath.Add(startPos);
             Vector3 currentPoint = startPos;
             float currentDistance;
             int closetsPointIndex = 0;
@@ -464,7 +494,8 @@ namespace UnityStandardAssets.Vehicles.Car
                         closetsPointIndex = i;
                     }
                 }
-                
+                Debug.LogFormat("Final path: Center point x: {0}, y: {1}", convexPoints[closetsPointIndex].x, convexPoints[closetsPointIndex].z);
+                currentPoint = convexPoints[closetsPointIndex];
                 tspPath.Add(convexPoints[closetsPointIndex]);
                 convexPoints.RemoveAt(closetsPointIndex);
                 
@@ -474,13 +505,10 @@ namespace UnityStandardAssets.Vehicles.Car
         //4 Support functions for path planning and construction_______________________________________________________
         private void planPath(List<Vector3> tspPath)
         {
-            traversabilityManager = new TraversabilityManager(terrain_manager, car_radius);
-
-            finalPath.Add(tspPath[0]);
-            tspPath.RemoveAt(0);
-            foreach (var convexCenter in tspPath)
+            finalPath.AddRange(pathFinder.FindPath(traversabilityManager.traversableCS, fa_mid, tspPath[0], traversabilityManager, m_Car.m_MaximumSteerAngle, L, max_v));
+            for(int i = 1; i < tspPath.Count; i++)
             {
-                finalPath.AddRange(pathFinder.FindPath(traversabilityManager.traversableCS, fa_mid, convexCenter, traversabilityManager, m_Car.m_MaximumSteerAngle, L, max_v));
+                finalPath.AddRange(pathFinder.FindPath(traversabilityManager.traversableCS, tspPath[i-1], tspPath[i], traversabilityManager, m_Car.m_MaximumSteerAngle, L, max_v));
             }
         }
         

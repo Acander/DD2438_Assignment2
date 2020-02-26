@@ -6,17 +6,16 @@ using UnityEngine;
 namespace Scrips
 {
      public class PathFinder
-    {
-
-        Dictionary<Node, bool> closedSet = new Dictionary<Node, bool>();
-        Dictionary<Node, bool> openSet = new Dictionary<Node, bool>();
+     {
+         private Dictionary<Node, bool> closedSet;
+         private Dictionary<Node, bool> openSet;
 
         //cost of start to this key node
-        Dictionary<Node, float> gScore = new Dictionary<Node, float>();
+         private Dictionary<Node, float> gScore;
         //cost of start to goal, passing through key node
-        Dictionary<Node, double> fScore = new Dictionary<Node, double>();
+         private Dictionary<Node, double> fScore;
 
-        Dictionary<Node, Node> nodeLinks = new Dictionary<Node, Node>();
+         private Dictionary<Node, Node> nodeLinks;
 
         // Heading resolution
         double heading_resolution = Math.PI / 4;
@@ -29,15 +28,26 @@ namespace Scrips
         // Car
         float L;
         float max_steering;
-        float dt = Time.fixedDeltaTime;
+        private float dt;
         float max_v;
 
         public List<Vector3> FindPath(bool[,] graph, Vector3 s, Vector3 g, TraversabilityManager traversabilityManager, float max_steering, float L, float max_v)
         {
+            closedSet = new Dictionary<Node, bool>();
+            openSet = new Dictionary<Node, bool>();
+
+            //cost of start to this key node
+            gScore = new Dictionary<Node, float>();
+            //cost of start to goal, passing through key node
+            fScore = new Dictionary<Node, double>();
+
+            nodeLinks = new Dictionary<Node, Node>();
+            
             var start = new Node(new DiscreteConfig(traversabilityManager.get_i_index(s.x), traversabilityManager.get_j_index(s.z), 0), s, 0f, 0f, 0f, new List<Vector3>()); ;
             var goal = new Node(new DiscreteConfig(traversabilityManager.get_i_index(g.x), traversabilityManager.get_j_index(g.z), 0), g, 0f, 0f, 0f, new List<Vector3>());
             
-            this.traversability = traversability;
+            traversability = traversabilityManager;
+            dt = Time.fixedDeltaTime;
             this.max_steering = max_steering * 0.9f;
             this.L = L;
             this.max_v = max_v;
