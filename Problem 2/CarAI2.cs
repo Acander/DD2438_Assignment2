@@ -71,7 +71,7 @@ namespace UnityStandardAssets.Vehicles.Car
             // get size of the terrian 
             int xn = terrain_manager.myInfo.x_N;
             int zn = terrain_manager.myInfo.z_N;
-
+            
             //1) Creating a complete convex set________________________________________________________________________
             //Init Data Structures
             int[][] map = new int[zn][];
@@ -84,13 +84,17 @@ namespace UnityStandardAssets.Vehicles.Car
             checkThatConvexCoversAreNotPartOfObstacles(convex_cover_boundary, map);
             drawConvexSet(convex_cover_boundary, zn);
             
-            //2) Create a set of minimum points that give maximum exposition___________________________________________
-            //Init data structures
-            //List<Vector3> convexPoints = new List<Vector3>();
             
-            selectPointsFromConvexCover(convex_cover_boundary, zn);
+            //2) Create a set of minimum points that give maximum exposition___________________________________________
+            //Init variables
+            float xSteps = terrain_manager.myInfo.x_high / 3;
+            float minimumX;
+
+            minimumX = selectMinimumX(xSteps);
+            selectPointsFromConvexCover(convex_cover_boundary, zn, minimumX, xSteps);
             Debug.LogFormat("Number of ConvexPoints: {0}", convexPoints.Count);
             Debug.Log("Number of ConvexPoints: ----------------------------------------");
+            
             
             //3) Solve the travelling salesman problem_________________________________________________________________
             //Init variables
@@ -208,18 +212,32 @@ namespace UnityStandardAssets.Vehicles.Car
             }*/
             
             // Draw path and trajectories along path
-            for (int i = 0; i < finalPath.Count-1; i++)
+
+            if (friends[0].name.Equals(gameObject.name))
             {
                 Gizmos.color = Color.yellow;
+            }
+            else if (friends[1].name.Equals(gameObject.name))
+            {
+                Gizmos.color = Color.cyan;
+            }
+            else if (friends[2].name.Equals(gameObject.name))
+            {
+                Gizmos.color = Color.red;
+            }
+            
+            for (int i = 0; i < finalPath.Count-1; i++)
+            {
                 Gizmos.DrawSphere(finalPath[i], 2f);
                 Gizmos.DrawLine(finalPath[i], finalPath[i+1]);
             }
             Gizmos.DrawSphere(finalPath[finalPath.Count-1], 5f);
             
             //Draw all mini goals
+            Gizmos.color = Color.blue;
             for (int i = 0; i < tspPath.Count-1; i++)
             {
-                Gizmos.color = Color.blue;
+                //Gizmos.color = Color.blue;
                 Gizmos.DrawSphere(tspPath[i], 5f);
                 //Gizmos.DrawLine(tspPath[i], tspPath[i+1]);
             }
@@ -456,7 +474,27 @@ namespace UnityStandardAssets.Vehicles.Car
 
         //2) Support functions for finding min set of points___________________________________________________________
 
-        private void selectPointsFromConvexCover(List<Tuple<int, int, int, int>> convex_cover_boundary, int zn)
+        private float selectMinimumX(float xSteps)
+        {
+            float minimumX = 0;
+            //Debug.Log(friends[0].name.Equals(gameObject.name));
+            if (friends[0].name.Equals(gameObject.name))
+            {
+                minimumX = 0;
+            }
+            else if (friends[1].name.Equals(gameObject.name))
+            {
+                minimumX = xSteps;
+            }
+            else if (friends[2].name.Equals(gameObject.name))
+            {
+                minimumX = xSteps * 2;
+            }
+
+            return minimumX;
+        }
+        
+        private void selectPointsFromConvexCover(List<Tuple<int, int, int, int>> convex_cover_boundary, int zn, float minimumX, float xStep)
         {
             //Select centerpoint of each rectangle
             float x_step = (terrain_manager.myInfo.x_high - terrain_manager.myInfo.x_low) / terrain_manager.myInfo.x_N;
@@ -470,7 +508,11 @@ namespace UnityStandardAssets.Vehicles.Car
                  terrain_manager.myInfo.get_x_pos(zn - 1 - hehe.Item1) + z_step / 2) / 2;
                 
                 Debug.LogFormat("Center point x: {0}, y: {1}", x_center, z_center);
-                convexPoints.Add(new Vector3(x_center, 0f, z_center));
+                Debug.LogFormat("Minimum X: {0}", minimumX);
+                if (minimumX <= x_center && x_center < minimumX + xStep)
+                {
+                    convexPoints.Add(new Vector3(x_center, 0f, z_center));
+                }
             }
             
         }
