@@ -82,7 +82,7 @@ namespace UnityStandardAssets.Vehicles.Car
             printGridMap(xn, zn, map);
             storeTheFourBoundriesOfAllConvexCover(occupancy_map, map, convex_cover_boundary);
             checkThatConvexCoversAreNotPartOfObstacles(convex_cover_boundary, map);
-            drawConvexSet(convex_cover_boundary, zn);
+            //drawConvexSet(convex_cover_boundary, zn);
             
             
             //2) Create a set of minimum points that give maximum exposition___________________________________________
@@ -194,7 +194,7 @@ namespace UnityStandardAssets.Vehicles.Car
 
         private void OnDrawGizmos()
         {
-            // Draw traverability
+            // Draw traversabillity
             /*for (int i = 0; i < traversabilityManager.n_x; i++)
             {
                 for (int j = 0; j < traversabilityManager.n_z; j++)

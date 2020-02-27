@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace Scrips
@@ -19,17 +20,9 @@ namespace Scrips
 
         // Heading resolution
         double heading_resolution = Math.PI / 4;
-        int ticks;
 
-        // Traversability manager
+         // Traversability manager
         TraversabilityManager traversability;
-        double d;
-
-        // Car
-        float L;
-        float max_steering;
-        private float dt;
-        float max_v;
 
         public List<Vector3> FindPath(bool[,] graph, Vector3 s, Vector3 g, TraversabilityManager traversabilityManager, float max_steering, float L, float max_v)
         {
@@ -43,16 +36,10 @@ namespace Scrips
 
             nodeLinks = new Dictionary<Node, Node>();
             
-            var start = new Node(new DiscreteConfig(traversabilityManager.get_i_index(s.x), traversabilityManager.get_j_index(s.z), 0), s, 0f, 0f, 0f, new List<Vector3>()); ;
-            var goal = new Node(new DiscreteConfig(traversabilityManager.get_i_index(g.x), traversabilityManager.get_j_index(g.z), 0), g, 0f, 0f, 0f, new List<Vector3>());
+            var start = new Node(new DiscreteConfig(traversabilityManager.get_i_index(s.x), traversabilityManager.get_j_index(s.z))); 
+            var goal = new Node(new DiscreteConfig(traversabilityManager.get_i_index(g.x), traversabilityManager.get_j_index(g.z)));
             
             traversability = traversabilityManager;
-            dt = Time.fixedDeltaTime;
-            this.max_steering = max_steering * 0.9f;
-            this.L = L;
-            this.max_v = max_v;
-            d = traversability.grid_hype + 0.01;
-            ticks = Convert.ToInt32(Math.Round(2 * Math.PI / heading_resolution));
 
             openSet[start] = true;
             gScore[start] = 0;
@@ -64,7 +51,7 @@ namespace Scrips
                 if (current.config.i == goal.config.i && current.config.j == goal.config.j)
                 {
                     var path = Reconstruct(current);
-                    path.Insert(0, start.fa_pos);
+                    path.Insert(0, s);
                     return path; 
                 }
 
@@ -73,14 +60,12 @@ namespace Scrips
                 closedSet[current] = true;
 
 
-                foreach (var neighbor in Neighbors(graph, current))
+                foreach (var neighbor in Neighbors(current))
                 {
                     if (closedSet.ContainsKey(neighbor))
                         continue;
 
-                    // Penalise changing steering
-                    var penalise_steer = Convert.ToSingle(neighbor.steer != 0f) * 10;
-                    var projectedG = getGScore(current) + penalise_steer;
+                    var projectedG = getGScore(current);
 
                     if (!openSet.ContainsKey(neighbor))
                         openSet[neighbor] = true;
@@ -94,8 +79,7 @@ namespace Scrips
 
                 }
             }
-
-
+            
             return new List<Vector3>();
         }
 
@@ -121,73 +105,48 @@ namespace Scrips
             return score;
         }
 
-        public IEnumerable<Node> Neighbors(bool[,] graph, Node node)
-        {
-            // Controls
-            var controls = new List<float>() { -1f, 0f, 1f };
-            foreach (var steer in controls)
-            {
-                // Move in trajectory using rear axel mid
-                var v = max_v;
-                var phi = steer * max_steering;
-                var theta = node.theta;
-                var fa_pos = node.fa_pos;
-                var center_start_pos = fa_pos - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-                var center_pos = center_start_pos;
-                var ra_start_pos = center_pos - Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-                var ra_pos = ra_start_pos;
-                var trajectory = new List<Vector3>();
-                while (Vector3.Distance(center_start_pos, center_pos) < d)
-                {
-                    var dx = dt * v * Mathf.Sin(theta);
-                    var dz = dt * v * Mathf.Cos(theta);
-                    var dTheta = dt * (v / L) * Mathf.Tan(phi);
-                    ra_pos += new Vector3(dx, 0, dz);
-                    center_pos = ra_pos + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-                    fa_pos = center_pos + Quaternion.Euler(0, theta, 0) * Vector3.forward * (L / 2);
-                    theta += dTheta;
-                    // Log front axel position in trajectory
-                    trajectory.Add(fa_pos);
-                }
-                // Check traversability using center pos
-                var i = traversability.get_i_index(center_pos.x);
-                var j = traversability.get_j_index(center_pos.z);
-                var tick = mod(Convert.ToInt32(theta / heading_resolution), ticks);
-                // Log front axel position
-                var new_pt = new Node(new DiscreteConfig(i, j, tick), fa_pos, theta, v, steer, trajectory);
-                if (IsValidNeighbor(graph, new_pt))
-                {
-                    yield return new_pt;
-                }
-            }
-        }
 
-        int mod(int x, int m)
-        {
-            int r = x % m;
-            return r < 0 ? r + m : r;
-        }
+         public IEnumerable<Node> Neighbors(Node node)
+         {
+             List<Node> neighbours = new List<Node>();
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i, node.config.j + 1)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i + 1, node.config.j + 1)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i + 1, node.config.j)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i + 1, node.config.j - 1)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i, node.config.j - 1)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i - 1, node.config.j - 1)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i - 1, node.config.j)));
+             neighbours.Add(new Node(new DiscreteConfig(node.config.i - 1, node.config.j + 1)));
+             for (int i = 0; i < neighbours.Count; i++)
+             {
+                 if (!IsValidNeighbor(neighbours[i]))
+                 {
+                     Debug.Log(
+                         "---------------------Invalid Neighbour!!!-----------------------------------------------");
+                     neighbours.RemoveAt(i);
+                     i--;
+                 }
+             }
+             Debug.LogFormat("Length of neighbours: {0}", neighbours.Count);
 
-        public bool IsValidNeighbor(bool[,] matrix, Node pt)
-        {
-            int i = pt.config.i;
-            int j = pt.config.j;
-            if (i < 0 || i >= matrix.GetLength(1))
-                return false;
-
-            if (j < 0 || j >= matrix.GetLength(0))
-                return false;
-
-            return matrix[i, j];
-
-        }
+    return neighbours;
+         }
+         
+         public bool IsValidNeighbor(Node pt)
+         {
+             /*float x_pos = traversability.get_x_pos(pt.config.i);
+             float z_pos = traversability.get_z_pos(pt.config.j);*/
+             return traversability.traversableCS[pt.config.i, pt.config.j];
+         }
 
         private List<Vector3> Reconstruct(Node current)
         {
             List<Vector3> path = new List<Vector3>();
             while (nodeLinks.ContainsKey(current))
             {
-                path.Add(current.fa_pos);
+                float x_pos = traversability.get_x_pos(current.config.i);
+                float z_pos = traversability.get_z_pos(current.config.j);
+                path.Add(new Vector3(x_pos, 0f, z_pos));
                 current = nodeLinks[current];
             }
 
