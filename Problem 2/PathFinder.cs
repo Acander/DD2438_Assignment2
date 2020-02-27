@@ -51,7 +51,7 @@ namespace Scrips
                 if (current.config.i == goal.config.i && current.config.j == goal.config.j)
                 {
                     var path = Reconstruct(current);
-                    path.Insert(0, s);
+                    path.Add(new Vector3(traversability.get_x_pos(current.config.i), 0, traversability.get_z_pos(current.config.j)));
                     return path; 
                 }
 
