@@ -50,16 +50,16 @@ namespace UnityStandardAssets.Vehicles.Car
             //Init V-formation 
             
             //Car 1 (Inner left)
-            CarPosition innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-8, 0,  -8));
+            CarPosition innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-8, 0,  -12));
 
             //Car 2 (Inner right)
-            CarPosition innerRight = new CarPosition(friends[0].transform.position, new Vector3(8, 0, -8));
+            CarPosition innerRight = new CarPosition(friends[0].transform.position, new Vector3(8, 0, -12));
             
             //Car 3 (Outer left)
-            CarPosition outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-16, 0, -16));
+            CarPosition outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-16, 0, -24));
             
             //Car 4 (Outer right)
-            CarPosition outerRight = new CarPosition(friends[0].transform.position, new Vector3(16, 0, -16));
+            CarPosition outerRight = new CarPosition(friends[0].transform.position, new Vector3(16, 0, -24));
             
             vShape = new CarFormation(friends, innerLeft, innerRight, outerLeft, outerRight);
 
@@ -94,12 +94,12 @@ namespace UnityStandardAssets.Vehicles.Car
 
         private void OnDrawGizmos()
         {
-            Gizmos.color = Color.cyan;
-            Debug.Log(currentFormation.innerLeft.position);
-            Gizmos.DrawSphere(currentFormation.innerLeft.position, 3f);
-            Gizmos.DrawSphere(currentFormation.innerRight.position, 3f);
-            Gizmos.DrawSphere(currentFormation.outerLeft.position, 3f);
-            Gizmos.DrawSphere(currentFormation.outerRight.position, 3f);
+            /*Gizmos.color = Color.cyan;
+            Debug.Log(currentFormation.innerLeft.formationPosition.position);
+            Gizmos.DrawSphere(currentFormation.innerLeft.formationPosition.position, 3f);
+            Gizmos.DrawSphere(currentFormation.innerRight.formationPosition.position, 3f);
+            Gizmos.DrawSphere(currentFormation.outerLeft.formationPosition.position, 3f);
+            Gizmos.DrawSphere(currentFormation.outerRight.formationPosition.position, 3f);*/
         }
     }
 }

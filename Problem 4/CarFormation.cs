@@ -20,16 +20,16 @@ namespace Scrips
         private GameObject[] friends;
         
         //Car 1 (Inner left)
-        public CarPosition innerLeft;
+        public PController innerLeft;
 
         //Car 2 (Inner right)
-        public CarPosition innerRight;
+        public PController innerRight;
         
         //Car 3 (Outer left)
-        public CarPosition outerLeft;
+        public PController outerLeft;
         
         //Car 4 (Outer right)
-        public CarPosition outerRight;
+        public PController outerRight;
 
         public CarFormation(GameObject[] friends, CarPosition innerLeft, CarPosition innerRight, CarPosition outerLeft, CarPosition outerRight)
         {
@@ -37,10 +37,10 @@ namespace Scrips
             lastLeaderPosition = new CarPosition(leader.transform.position, new Vector3(0, 0, 0));
             oldForwardVector = leader.transform.forward;
             Debug.LogFormat("Initial position {0}", lastLeaderPosition.position);
-            this.innerLeft = innerLeft;
-            this.innerRight = innerRight;
-            this.outerLeft = outerLeft;
-            this.outerRight = outerRight;
+            this.innerLeft = new PController(friends[1], leader, innerLeft);
+            this.innerRight = new PController(friends[2], leader, innerRight);
+            this.outerLeft = new PController(friends[3], leader, outerLeft);
+            this.outerRight = new PController(friends[4], leader, outerRight);
             this.friends = friends;
         }
 
@@ -55,19 +55,19 @@ namespace Scrips
             Debug.LogFormat("Update angle: {0}", angle);
             
             //Save old positions
-            innerLeft.oldPos = innerLeft.position;
-            innerRight.oldPos = innerRight.position;
-            outerLeft.oldPos = outerLeft.position;
-            outerRight.oldPos = outerRight.position;
+            innerLeft.formationPosition.oldPos = innerLeft.formationPosition.position;
+            innerRight.formationPosition.oldPos = innerRight.formationPosition.position;
+            outerLeft.formationPosition.oldPos = outerLeft.formationPosition.position;
+            outerRight.formationPosition.oldPos = outerRight.formationPosition.position;
             
-            innerLeft.differenceVector = Quaternion.Euler(0, angle, 0) * innerLeft.differenceVector;
-            innerLeft.position = leaderPosition - innerLeft.differenceVector;;
-            innerRight.differenceVector = Quaternion.Euler(0, angle, 0) * innerRight.differenceVector;
-            innerRight.position = leaderPosition - innerRight.differenceVector;
-            outerLeft.differenceVector = Quaternion.Euler(0, angle, 0) * outerLeft.differenceVector;
-            outerLeft.position = leaderPosition - outerLeft.differenceVector;
-            outerRight.differenceVector = Quaternion.Euler(0, angle, 0) * outerRight.differenceVector;
-            outerRight.position = leaderPosition - outerRight.differenceVector;
+            innerLeft.formationPosition.differenceVector = Quaternion.Euler(0, angle, 0) * innerLeft.formationPosition.differenceVector;
+            innerLeft.formationPosition.position = leaderPosition - innerLeft.formationPosition.differenceVector;;
+            innerRight.formationPosition.differenceVector = Quaternion.Euler(0, angle, 0) * innerRight.formationPosition.differenceVector;
+            innerRight.formationPosition.position = leaderPosition - innerRight.formationPosition.differenceVector;
+            outerLeft.formationPosition.differenceVector = Quaternion.Euler(0, angle, 0) * outerLeft.formationPosition.differenceVector;
+            outerLeft.formationPosition.position = leaderPosition - outerLeft.formationPosition.differenceVector;
+            outerRight.formationPosition.differenceVector = Quaternion.Euler(0, angle, 0) * outerRight.formationPosition.differenceVector;
+            outerRight.formationPosition.position = leaderPosition - outerRight.formationPosition.differenceVector;
             
             lastLeaderPosition.position = leader.transform.position;
             oldForwardVector = leader.transform.forward;
@@ -99,60 +99,28 @@ namespace Scrips
             dirToLeader = myPosition - parentPosition;
             //dirNorm = dirToLeader.normalized;*/
 
-            Vector3 myPosition = car.transform.position;
-            bool passed = false;
-            bool is_to_the_right = true;
-            //bool tooFarAway = false;
-            
             //double steeringError 
 
+            CarControls controls = new CarControls(0f, 0f, 0f, 0f);
             if (friends[1].name == car.name)
             {
-                //Left
-                passed = this.passed(car.transform.position, innerLeft.oldPos, innerLeft.position);
-                is_to_the_right = Vector3.Dot(innerLeft.position - car.transform.position, car.transform.right) < 0;
-                Debug.DrawLine(innerLeft.position, car.transform.position);
+                controls = innerLeft.getCarControls();
             } 
             else if (friends[3].name == car.name)
             {
-                passed = this.passed(car.transform.position, outerLeft.oldPos, outerLeft.position);
-                is_to_the_right = Vector3.Dot(outerLeft.position - car.transform.position, car.transform.right) < 0;
-                Debug.DrawLine(outerLeft.position, car.transform.position);
+                controls = outerLeft.getCarControls();
             }
             else if (friends[2].name == car.name)
             {
-                passed = this.passed(car.transform.position, innerRight.oldPos, innerRight.position);
-                is_to_the_right = Vector3.Dot(innerRight.position - car.transform.position, car.transform.right) < 0;
-                Debug.DrawLine(innerRight.position, car.transform.position);
+                controls = innerRight.getCarControls();
             }
             else if (friends[4].name == car.name)
             {
-                passed = this.passed(car.transform.position, outerRight.oldPos, outerRight.position);
-                is_to_the_right = Vector3.Dot(outerRight.position - car.transform.position, car.transform.right) < 0;
-                Debug.DrawLine(outerRight.position, car.transform.position);
+                controls = outerRight.getCarControls();
             }
+
+            //leader.GetComponent<CarController>().CurrentSpeed;
             
-            float steering;
-            float acceleration = 0.8f;
-
-            if (is_to_the_right)
-            {
-                steering = -1f;
-            }
-            else
-            {
-                steering = 1f;
-            }
-            /*if (passed)
-            {
-                acceleration = -1f;
-            }
-            else
-            {
-                acceleration = 1f;
-            }*/
-
-            CarControls controls = new CarControls(steering, acceleration, acceleration, 0);
             return controls;
         }
 
@@ -161,14 +129,6 @@ namespace Scrips
             return friends[1].name == car.name || friends[2].name == car.name;
         }
         
-        private bool passed(Vector3 pos, Vector3 start_pos, Vector3 end_pos)
-        {
-            var between = end_pos - start_pos;
-            var progress = pos - start_pos;
-            var projection = Vector3.Project(progress, between);
-            
-            return projection.magnitude >= between.magnitude;
-        }
 
     }
 
@@ -219,7 +179,5 @@ namespace Scrips
             this.handBrake = handBrake;
         }
     }
-    
-    
-    
+
 }
