@@ -23,8 +23,9 @@ namespace UnityStandardAssets.Vehicles.Car
         private GameObject parent;
 
         private CarFormation vShape;
-        private CarFormation sweepShape;
+        private CarFormation slimShape;
         private CarFormation currentFormation;
+        private float sweepLength = 55f;
 
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
@@ -50,43 +51,56 @@ namespace UnityStandardAssets.Vehicles.Car
             //Init V-formation 
             
             //Car 1 (Inner left)
-            CarPosition innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-8, 0,  -12));
+            CarPosition innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-sweepLength/4, 0,  -12));
 
             //Car 2 (Inner right)
-            CarPosition innerRight = new CarPosition(friends[0].transform.position, new Vector3(8, 0, -12));
+            CarPosition innerRight = new CarPosition(friends[0].transform.position, new Vector3(sweepLength/4, 0, -12));
             
             //Car 3 (Outer left)
-            CarPosition outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-16, 0, -24));
+            CarPosition outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-sweepLength/2, 0, -24));
             
             //Car 4 (Outer right)
-            CarPosition outerRight = new CarPosition(friends[0].transform.position, new Vector3(16, 0, -24));
+            CarPosition outerRight = new CarPosition(friends[0].transform.position, new Vector3(sweepLength/2, 0, -24));
             
             vShape = new CarFormation(friends, innerLeft, innerRight, outerLeft, outerRight);
 
             //Init Sweep-formation
+            
             //Car 1 (Inner left)
-            innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-16, 0,  0));
+            innerLeft = new CarPosition(friends[0].transform.position, new Vector3(-sweepLength/8, 0,  -12));
 
             //Car 2 (Inner right)
-            innerRight = new CarPosition(friends[0].transform.position, new Vector3(16, 0,  0));
+            innerRight = new CarPosition(friends[0].transform.position, new Vector3(sweepLength/8, 0,  -12));
             
             //Car 3 (Outer left)
-            outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-32, 0,  0));
+            outerLeft = new CarPosition(friends[0].transform.position, new Vector3(-sweepLength/4, 0,  -18));
             
             //Car 4 (Outer right)
-            outerRight = new CarPosition(friends[0].transform.position, new Vector3(32, 0,  0));
+            outerRight = new CarPosition(friends[0].transform.position, new Vector3(sweepLength/4, 0,  -18));
             
-            sweepShape = new CarFormation(friends, innerLeft, innerRight, outerLeft, outerRight);
+            slimShape = new CarFormation(friends, innerLeft, innerRight, outerLeft, outerRight);
 
             currentFormation = vShape;
         }
-        
-        
+
+
         private void FixedUpdate()
         {
-
-            CarControls carControls = currentFormation.getCarControls(gameObject);
+            CarControls carControls;
+            Vector3 leaderPosition = friends[0].transform.position;
+            Vector3 leftSidePosition = leaderPosition - friends[0].transform.right*sweepLength/2;
+            Vector3 rightSidePosition = leaderPosition + friends[0].transform.right*sweepLength/2;
             
+            if (!traversabilityManager.PointTraversableCS(rightSidePosition.x, rightSidePosition.z) || !traversabilityManager.PointTraversableCS(leftSidePosition.x, leftSidePosition.z))
+            {
+                currentFormation = slimShape;
+            }
+            else
+            {
+                currentFormation = vShape;
+            }
+        
+            carControls = currentFormation.getCarControls(gameObject);
             m_Car.Move(carControls.steering, carControls.acceleration, carControls.acceleration, 0f);
 
 
@@ -94,12 +108,12 @@ namespace UnityStandardAssets.Vehicles.Car
 
         private void OnDrawGizmos()
         {
-            /*Gizmos.color = Color.cyan;
+            Gizmos.color = Color.cyan;
             Debug.Log(currentFormation.innerLeft.formationPosition.position);
             Gizmos.DrawSphere(currentFormation.innerLeft.formationPosition.position, 3f);
             Gizmos.DrawSphere(currentFormation.innerRight.formationPosition.position, 3f);
             Gizmos.DrawSphere(currentFormation.outerLeft.formationPosition.position, 3f);
-            Gizmos.DrawSphere(currentFormation.outerRight.formationPosition.position, 3f);*/
+            Gizmos.DrawSphere(currentFormation.outerRight.formationPosition.position, 3f);
         }
     }
 }
