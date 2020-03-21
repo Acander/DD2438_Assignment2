@@ -37,27 +37,31 @@ namespace Scrips
             float acceleration = 0.05f*magnitude;
             float steering = 0.05f*magnitude;
             
-            CarControls controls = new CarControls(0, 0, 0, 0);
+            /*float acceleration = 1f;
+            float steering = 1f;*/
+            
+            //CarControls controls = new CarControls(0, 0, 0, 0);
 
-            if (magnitude < 5)
+            if (magnitude < 10)
             {
                 //acceleration = matchCarControls();
                 acceleration = 0f;
-                steering = 0f;
+                steering = 0.1f;
             }
 
+            if (passed)
+            {
+                //acceleration = -acceleration;
+                acceleration = 0;
+                is_to_the_right = Vector3.Dot(leader.transform.forward, car.transform.right) < 0;
+            }
             if (is_to_the_right)
             {
                 steering = -steering;
             }
 
-            if (passed)
-            {
-                acceleration = -acceleration;
-            }
-
-            controls = new CarControls(steering, acceleration, acceleration, 0);
-            return controls;
+            return new CarControls(steering, acceleration, acceleration, 0);
+            
         }
         
         private bool passed(Vector3 pos, Vector3 direction, Vector3 goal_pos)

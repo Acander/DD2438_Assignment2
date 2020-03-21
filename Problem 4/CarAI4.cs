@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using Scrips;
+using UnityEditor;
+using Debug = UnityEngine.Debug;
 using Vector3 = UnityEngine.Vector3;
 
 
@@ -14,6 +17,8 @@ namespace UnityStandardAssets.Vehicles.Car
     {
         private CarController m_Car; // the car controller we want to use
         private float car_radius = 5f;
+        private Stopwatch stopwatch = new Stopwatch();
+        private bool collision = false;
 
         private double inner_height = 5;
         private double outer_height = 10;
@@ -25,7 +30,7 @@ namespace UnityStandardAssets.Vehicles.Car
         private CarFormation vShape;
         private CarFormation slimShape;
         private CarFormation currentFormation;
-        private float sweepLength = 55f;
+        private float sweepLength = 70f;
 
         public GameObject terrain_manager_game_object;
         TerrainManager terrain_manager;
@@ -86,11 +91,28 @@ namespace UnityStandardAssets.Vehicles.Car
 
         private void FixedUpdate()
         {
+            Vector3 goalPos = new Vector3();
+            if (friends[1].name == gameObject.name)
+            {
+                goalPos = currentFormation.innerLeft.formationPosition.position;
+            } 
+            else if (friends[3].name == gameObject.name)
+            {
+                goalPos = currentFormation.outerLeft.formationPosition.position;
+            }
+            else if (friends[2].name == gameObject.name)
+            {
+                goalPos = currentFormation.innerRight.formationPosition.position;
+            }
+            else if (friends[4].name == gameObject.name)
+            {
+                goalPos = currentFormation.outerRight.formationPosition.position;
+            }
+            
             CarControls carControls;
             Vector3 leaderPosition = friends[0].transform.position;
             Vector3 leftSidePosition = leaderPosition - friends[0].transform.right*sweepLength/2;
             Vector3 rightSidePosition = leaderPosition + friends[0].transform.right*sweepLength/2;
-            
             if (!traversabilityManager.PointTraversableCS(rightSidePosition.x, rightSidePosition.z) || !traversabilityManager.PointTraversableCS(leftSidePosition.x, leftSidePosition.z))
             {
                 currentFormation = slimShape;
@@ -99,11 +121,72 @@ namespace UnityStandardAssets.Vehicles.Car
             {
                 currentFormation = vShape;
             }
-        
+            
+            /*if (check_Should_Reverse(transform.position, transform.forward, goalPos) || collision)
+            {
+                currentFormation.getCarControls(gameObject);
+                if (collision)
+                {
+                    //Check if we have 'cleared'
+                    if (stopwatch.ElapsedMilliseconds > 1000)
+                    {
+                        collision = false;
+                        stopwatch.Stop();
+                        stopwatch.Reset();
+                    }
+                }
+                Debug.Log("Reversing!!!!!!!!");
+                var localVel = transform.InverseTransformDirection(GetComponent<Rigidbody>().velocity);
+                float forwardSpeed = localVel.z; //Negative speed means it is reversing
+                NextMove nextMove = reverse_Routine(forwardSpeed, transform.position, transform.right, goalPos);
+                m_Car.Move(nextMove.steeringAngle, nextMove.throttle, nextMove.footBrake, nextMove.handBrake);
+            }
+            else
+            {
+                carControls = currentFormation.getCarControls(gameObject);
+                m_Car.Move(carControls.steering, carControls.acceleration, carControls.acceleration, 0f);
+            }*/
+            
             carControls = currentFormation.getCarControls(gameObject);
             m_Car.Move(carControls.steering, carControls.acceleration, carControls.acceleration, 0f);
 
 
+
+        }
+        
+        public NextMove reverse_Routine(float forwardVelocity, Vector3 currentPos, Vector3 right, Vector3 goalPos)
+        {
+            //Debug.Log("Reversing!!!!!!!!!!!!!!!!");
+            float steeringAngle = steer_dir(currentPos, right, goalPos);
+            if (forwardVelocity > 0)
+            {
+                return new NextMove(steeringAngle, 0, -1, 0f);
+            }
+            //Debug.Log("Reversing!!!!!!!!!!!!!!!!");
+            return new NextMove(-steeringAngle, 0, -1, 0f);
+            //return new NextMove(0, -1f, 0f, 0f);
+        }
+        
+        public Boolean check_Should_Reverse(Vector3 currentPos, Vector3 carHeading, Vector3 goalPos)
+        {
+            Debug.DrawLine(currentPos, goalPos, Color.white);
+            float reverseScore = Vector3.Dot(goalPos-currentPos, carHeading);
+            //Debug.LogFormat("Reverse score: {0}", reverseScore);
+            //Debug.LogFormat("Carheading: {0} ", carHeading);
+            return reverseScore < 0;
+        }
+        
+        public float steer_dir(Vector3 pos, Vector3 right, Vector3 end_pos)
+        {
+            var dir = end_pos - pos;
+            float dot = Vector3.Dot(right, dir);
+            return dot > 0f ? 1f : -1f;
+        }
+        
+        private void OnCollisionEnter()
+        {
+            collision = true;
+            stopwatch.Start();
         }
 
         private void OnDrawGizmos()
@@ -115,5 +198,6 @@ namespace UnityStandardAssets.Vehicles.Car
             Gizmos.DrawSphere(currentFormation.outerLeft.formationPosition.position, 3f);
             Gizmos.DrawSphere(currentFormation.outerRight.formationPosition.position, 3f);
         }
+        
     }
 }
